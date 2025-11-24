@@ -236,13 +236,26 @@ class WebBluetoothAudioSync extends EventEmitter {
             const successfulConnections = [];
             
             for (const result of connectionResults) {
+                this.log.debug('Processing connection result', {
+                    success: result.success,
+                    hasDevice: !!result.device,
+                    deviceId: result.device?.id || 'none',
+                    configName: result.config?.name || 'unknown'
+                });
+
                 if (result.success) {
+                    if (!result.device) {
+                        this.log.error('Connection result success but device is undefined', {
+                            result: JSON.stringify(result)
+                        });
+                        throw new Error('Device is undefined in successful connection result');
+                    }
                     await this._setupDeviceSynchronization(result.device);
                     successfulConnections.push(result);
                 } else {
-                    this.log.warn('Device connection failed', { 
+                    this.log.warn('Device connection failed', {
                         deviceId: result.config?.name || 'unknown',
-                        error: result.error 
+                        error: result.error
                     });
                 }
             }
@@ -803,12 +816,33 @@ class WebBluetoothAudioSync extends EventEmitter {
                 throw new Error('AudioContext not available for stream creation');
             }
 
-            const audioContext = new AudioContextClass();
+            let audioContext;
+            try {
+                audioContext = new AudioContextClass();
+            } catch (error) {
+                this.log.error('Failed to create AudioContext in stream creation', {
+                    error: error.message,
+                    AudioContextClass: AudioContextClass.name
+                });
+                throw new Error(`AudioContext construction failed: ${error.message}`);
+            }
+
             const destination = audioContext.createMediaStreamDestination();
 
             // Resume AudioContext if it's suspended (required in modern browsers)
             if (audioContext.state === 'suspended') {
-                await audioContext.resume();
+                try {
+                    await audioContext.resume();
+                    this.log.debug('AudioContext resumed successfully', {
+                        state: audioContext.state
+                    });
+                } catch (resumeError) {
+                    this.log.warn('Failed to resume AudioContext', {
+                        error: resumeError.message,
+                        state: audioContext.state
+                    });
+                    // Continue anyway, as some contexts may work suspended
+                }
             }
 
             this.log.info('Audio stream created successfully', {

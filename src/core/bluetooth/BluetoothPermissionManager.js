@@ -43,13 +43,19 @@ class BluetoothPermissionManager extends EventEmitter {
      */
     async requestDeviceConnection(deviceConfig) {
         this.log.info('Requesting device connection', { deviceConfig });
-        
+
+        // Handle simulated devices
+        if (deviceConfig.isSimulated) {
+            this.log.info('Handling simulated device connection', { deviceId: deviceConfig.id });
+            return this._handleSimulatedDevice(deviceConfig);
+        }
+
         // Validate security context
         this._validateSecurityContext();
-        
+
         // Validate device configuration
         this._validateDeviceConfig(deviceConfig);
-        
+
         const requestId = this._generateRequestId();
         const requestState = {
             id: requestId,
@@ -58,12 +64,12 @@ class BluetoothPermissionManager extends EventEmitter {
             retryCount: 0,
             status: 'pending'
         };
-        
+
         this.pendingRequests.set(requestId, requestState);
-        
+
         try {
             this.emit('requestStarted', { requestId, deviceConfig });
-            
+
             const device = await this._performDeviceRequest(deviceConfig, requestId);
             
             // Set up device event listeners
@@ -437,6 +443,38 @@ class BluetoothPermissionManager extends EventEmitter {
         if (!this.supported) {
             this.log.warn('Web Bluetooth is not supported in this browser');
         }
+    }
+
+    /**
+     * Handle simulated device connection
+     * @param {object} deviceConfig - Simulated device configuration
+     * @returns {Promise<object>} Mock connection result
+     * @private
+     */
+    async _handleSimulatedDevice(deviceConfig) {
+        // Create a mock Bluetooth device object
+        const mockDevice = {
+            id: deviceConfig.id,
+            name: deviceConfig.name,
+            gatt: {
+                connect: async () => ({
+                    getPrimaryServices: async () => [
+                        { uuid: 'audio_service_uuid' } // Mock service
+                    ]
+                })
+            },
+            addEventListener: () => {}, // Mock
+            removeEventListener: () => {} // Mock
+        };
+
+        this.log.info('Simulated device connected', { deviceId: deviceConfig.id });
+
+        return {
+            success: true,
+            device: mockDevice,
+            requestId: this._generateRequestId(),
+            timestamp: Date.now()
+        };
     }
 
     /**

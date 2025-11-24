@@ -66,9 +66,26 @@ class SystemAudioCapture extends EventEmitter {
                     throw new Error('AudioContext not available in this browser');
                 }
 
-                this.audioContext = new AudioContextClass({
+                this.log.debug('Creating AudioContext', {
+                    AudioContextClass: AudioContextClass.name,
                     sampleRate: this.sampleRate
                 });
+
+                try {
+                    this.audioContext = new AudioContextClass({
+                        sampleRate: this.sampleRate
+                    });
+                    this.log.debug('AudioContext created successfully', {
+                        state: this.audioContext.state,
+                        sampleRate: this.audioContext.sampleRate
+                    });
+                } catch (error) {
+                    this.log.error('Failed to create AudioContext', {
+                        error: error.message,
+                        AudioContextClass: AudioContextClass.name
+                    });
+                    throw error;
+                }
 
                 // Resume AudioContext if it's suspended (required in modern browsers)
                 if (this.audioContext.state === 'suspended') {

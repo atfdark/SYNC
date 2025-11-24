@@ -100,9 +100,19 @@ class DeviceManager extends EventEmitter {
         this.emit('connectionStarted', { connectionId, deviceConfig });
         
         try {
+            this.log.debug('Requesting device connection from permission manager', {
+                deviceConfig: this._sanitizeConfig(deviceConfig)
+            });
+
             // Request device connection
             const deviceResult = await this.permissionManager.requestDeviceConnection(deviceConfig);
             const device = deviceResult.device;
+
+            this.log.debug('Device connection result', {
+                success: deviceResult.success,
+                hasDevice: !!device,
+                deviceId: device?.id || 'none'
+            });
             
             // Update connection state
             this.connectionStates.set(device.id, {
@@ -313,21 +323,24 @@ class DeviceManager extends EventEmitter {
                 name: 'Bluetooth Speaker 1',
                 type: 'audio_output',
                 signalStrength: -45,
-                battery: 85
+                battery: 85,
+                isSimulated: true
             },
             {
-                id: 'sim_device_2', 
+                id: 'sim_device_2',
                 name: 'Bluetooth Speaker 2',
                 type: 'audio_output',
                 signalStrength: -52,
-                battery: 67
+                battery: 67,
+                isSimulated: true
             },
             {
                 id: 'sim_device_3',
                 name: 'Wireless Headphones',
-                type: 'audio_output', 
+                type: 'audio_output',
                 signalStrength: -38,
-                battery: 92
+                battery: 92,
+                isSimulated: true
             }
         ];
         

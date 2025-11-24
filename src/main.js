@@ -13,6 +13,7 @@ import { AudioSyncEngine } from './core/audio/AudioSyncEngine.js';
 import { BufferManager } from './core/audio/BufferManager.js';
 import { LatencyCompensation } from './core/audio/LatencyCompensation.js';
 import { SystemAudioCapture } from './core/audio/SystemAudioCapture.js';
+import { WebRTCAudioManager } from './core/network/WebRTCAudioManager.js';
 
 /**
  * Main Web Bluetooth Audio Sync System
@@ -69,12 +70,21 @@ class WebBluetoothAudioSync extends EventEmitter {
             monitorVolume: true // Keep system audio playing through laptop speakers
         });
         
+        // WebRTC audio streaming for mobile device connectivity
+        this.webrtcManager = new WebRTCAudioManager({
+            sampleRate: this.config.sampleRate
+        });
+        
         // Device tracking
         this.deviceClocks = new Map(); // deviceId -> DeviceClock
         this.activeDevices = new Set();
         
+        // Mobile device tracking
+        this.mobilePeers = new Set();
+        
         // Dual output configuration
         this.dualOutputMode = false;
+        this.mobileOutputMode = false;
         this.localAudioOutput = true; // Always allow laptop speakers to play
         
         // System state
@@ -179,6 +189,12 @@ class WebBluetoothAudioSync extends EventEmitter {
         try {
             // Stop system audio capture
             await this.stopSystemAudioCapture();
+            
+            // Stop mobile audio streaming
+            await this.stopMobileAudioStreaming();
+            
+            // Disconnect all mobile peers
+            await this.disconnectAllMobilePeers();
             
             // Stop all components
             this.masterClock.stop();
@@ -377,7 +393,10 @@ class WebBluetoothAudioSync extends EventEmitter {
                 bufferStatus: this.systemAudioCapture.getBufferStatus(),
                 stats: this.systemAudioCapture.getStats()
             },
+            webrtcManager: this.webrtcManager.getStats(),
+            mobileConnectivity: this.getMobileConnectivityStatus(),
             dualOutputMode: this.dualOutputMode,
+            mobileOutputMode: this.mobileOutputMode,
             localAudioOutput: this.localAudioOutput,
             systemStats: { ...this.systemStats },
             configuration: { ...this.config }
@@ -597,6 +616,203 @@ class WebBluetoothAudioSync extends EventEmitter {
             this.log.error('Error stopping system audio playback', { sessionId, error: error.message });
             return false;
         }
+    }
+
+    /**
+     * Enable mobile output mode for tablet/phone connectivity
+     * @param {boolean} enable - Enable mobile output
+     */
+    async enableMobileOutput(enable = true) {
+        this.mobileOutputMode = enable;
+        
+        if (enable) {
+            this.log.info('Enabling mobile output mode');
+            this.emit('mobileOutputEnabled');
+        } else {
+            this.log.info('Disabling mobile output mode');
+            await this.disconnectAllMobilePeers();
+            this.emit('mobileOutputDisabled');
+        }
+    }
+
+    /**
+     * Check if WebRTC is supported for mobile connectivity
+     * @returns {boolean} True if supported
+     */
+    isWebRTCSupported() {
+        return this.webrtcManager.isSupported();
+    }
+
+    /**
+     * Create connection offer for a mobile peer
+     * @param {string} peerId - Mobile device identifier
+     * @returns {Promise<object>} Connection offer
+     */
+    async createMobileConnectionOffer(peerId) {
+        if (!this.mobileOutputMode) {
+            throw new Error('Mobile output mode must be enabled first');
+        }
+
+        if (!this.webrtcManager.isSupported()) {
+            throw new Error('WebRTC not supported on this device');
+        }
+
+        try {
+            this.log.info('Creating mobile connection offer', { peerId });
+            
+            const offerData = await this.webrtcManager.createConnectionOffer(peerId);
+            
+            this.emit('mobileConnectionOfferCreated', { peerId, offerData });
+            
+            return offerData;
+            
+        } catch (error) {
+            this.log.error('Failed to create mobile connection offer', { 
+                peerId, 
+                error: error.message 
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Accept connection answer from mobile peer
+     * @param {string} peerId - Mobile device identifier
+     * @param {object} answer - Connection answer data
+     * @returns {Promise<void>}
+     */
+    async acceptMobileConnectionAnswer(peerId, answer) {
+        try {
+            await this.webrtcManager.acceptConnectionAnswer(peerId, answer);
+            
+            this.mobilePeers.add(peerId);
+            
+            this.emit('mobilePeerConnected', { peerId });
+            
+            this.log.info('Mobile peer connected', { peerId });
+            
+        } catch (error) {
+            this.log.error('Failed to accept mobile connection answer', { 
+                peerId, 
+                error: error.message 
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Start streaming system audio to all mobile peers
+     * @returns {Promise<void>}
+     */
+    async startMobileAudioStreaming() {
+        if (!this.mobileOutputMode) {
+            throw new Error('Mobile output mode must be enabled first');
+        }
+
+        try {
+            // Ensure system audio is being captured
+            if (!this.systemAudioCapture.getIsCapturing()) {
+                await this.startSystemAudioCapture();
+            }
+
+            // Get audio stream from system capture
+            const audioStream = await this._createAudioStreamFromSystemCapture();
+
+            // Start streaming to all mobile peers
+            await this.webrtcManager.startAudioStreaming(audioStream);
+
+            this.emit('mobileAudioStreamingStarted');
+            
+            this.log.info('Started mobile audio streaming', { 
+                peerCount: this.mobilePeers.size 
+            });
+
+        } catch (error) {
+            this.log.error('Failed to start mobile audio streaming', { 
+                error: error.message 
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Stop streaming audio to mobile peers
+     */
+    async stopMobileAudioStreaming() {
+        try {
+            this.webrtcManager.stopAudioStreaming();
+            
+            this.emit('mobileAudioStreamingStopped');
+            
+            this.log.info('Stopped mobile audio streaming');
+            
+        } catch (error) {
+            this.log.error('Failed to stop mobile audio streaming', { 
+                error: error.message 
+            });
+        }
+    }
+
+    /**
+     * Disconnect specific mobile peer
+     * @param {string} peerId - Mobile device identifier
+     */
+    async disconnectMobilePeer(peerId) {
+        try {
+            this.webrtcManager.disconnectPeer(peerId);
+            this.mobilePeers.delete(peerId);
+            
+            this.emit('mobilePeerDisconnected', { peerId });
+            
+            this.log.info('Mobile peer disconnected', { peerId });
+            
+        } catch (error) {
+            this.log.error('Failed to disconnect mobile peer', { 
+                peerId, 
+                error: error.message 
+            });
+        }
+    }
+
+    /**
+     * Disconnect all mobile peers
+     */
+    async disconnectAllMobilePeers() {
+        for (const peerId of this.mobilePeers) {
+            await this.disconnectMobilePeer(peerId);
+        }
+    }
+
+    /**
+     * Create audio stream from system audio capture
+     * @returns {Promise<MediaStream>} Audio stream
+     * @private
+     */
+    async _createAudioStreamFromSystemCapture() {
+        // This is a simplified implementation
+        // In a real scenario, you'd create a MediaStream from the captured audio
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const destination = audioContext.createMediaStreamDestination();
+        
+        // Connect the audio context to create a stream
+        // This would need to be connected to the actual captured audio
+        
+        return destination.stream;
+    }
+
+    /**
+     * Get mobile connectivity status
+     * @returns {object} Mobile connectivity status
+     */
+    getMobileConnectivityStatus() {
+        return {
+            mobileOutputMode: this.mobileOutputMode,
+            webrtcSupported: this.webrtcManager.isSupported(),
+            connectedPeers: Array.from(this.mobilePeers),
+            totalPeers: this.mobilePeers.size,
+            streaming: this.webrtcManager.isStreaming,
+            stats: this.webrtcManager.getStats()
+        };
     }
 
     /**

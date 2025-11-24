@@ -564,6 +564,87 @@
             color: #b8c5d6;
         }
 
+        /* Mobile Connectivity Section */
+        .mobile-connectivity-section {
+            margin: 30px 0;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .mobile-device-list {
+            margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .mobile-device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .device-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .device-icon {
+            font-size: 24px;
+        }
+
+        .device-details {
+            text-align: left;
+        }
+
+        .device-name {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .device-status {
+            font-size: 12px;
+            color: #b8c5d6;
+        }
+
+        .connection-qr {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .qr-placeholder {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 48px;
+        }
+
+        .connection-url {
+            font-size: 12px;
+            word-break: break-all;
+            color: #b8c5d6;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .player-main {
@@ -770,6 +851,47 @@
             </div>
         </section>
 
+        <!-- Mobile Connectivity Section -->
+        <section class="mobile-connectivity-section" id="mobileConnectivitySection">
+            <div class="fade-in">
+                <h3 style="margin-bottom: 20px;">📱 Mobile Speaker Connection</h3>
+                
+                <!-- Mobile Output Toggle -->
+                <div class="dual-output-toggle">
+                    <div class="toggle-switch" id="mobileOutputToggle">
+                        <div class="toggle-handle"></div>
+                    </div>
+                    <span class="dual-output-label">Connect tablets/phones as additional speakers</span>
+                </div>
+
+                <!-- Mobile Device List -->
+                <div class="mobile-device-list" id="mobileDeviceList">
+                    <div style="color: #b8c5d6; font-style: italic;">
+                        No mobile devices connected. Enable mobile output mode to connect tablets/phones.
+                    </div>
+                </div>
+
+                <!-- Connection QR/URL -->
+                <div class="connection-qr" id="connectionQR" style="display: none;">
+                    <div class="qr-placeholder">📱</div>
+                    <div>Scan QR or visit URL on your mobile device:</div>
+                    <div class="connection-url" id="connectionURL">
+                        https://your-domain.com/mobile-speaker.html
+                    </div>
+                    <p style="font-size: 12px; color: #b8c5d6; margin-top: 10px;">
+                        1. Open this URL on your tablet/phone<br>
+                        2. Tap "Connect to Laptop"<br>
+                        3. Your device will act as an additional speaker!
+                    </p>
+                </div>
+
+                <div class="system-audio-info">
+                    <p>Connect your tablet or phone to use it as an additional synchronized speaker.</p>
+                    <p>Perfect for parties, meetings, or when you need extra audio coverage!</p>
+                </div>
+            </div>
+        </section>
+
         <!-- Speakers Section -->
         <section class="speakers-section">
             <div class="section-header">
@@ -836,7 +958,14 @@
                     startCaptureBtn: document.getElementById('startCaptureBtn'),
                     stopCaptureBtn: document.getElementById('stopCaptureBtn'),
                     audioLevelFill: document.getElementById('audioLevelFill'),
-                    captureStatus: document.getElementById('captureStatus')
+                    captureStatus: document.getElementById('captureStatus'),
+                    
+                    // Mobile Connectivity elements
+                    mobileConnectivitySection: document.getElementById('mobileConnectivitySection'),
+                    mobileOutputToggle: document.getElementById('mobileOutputToggle'),
+                    mobileDeviceList: document.getElementById('mobileDeviceList'),
+                    connectionQR: document.getElementById('connectionQR'),
+                    connectionURL: document.getElementById('connectionURL')
                 };
 
                 this._setupEventListeners();
@@ -941,6 +1070,35 @@
                         this._updateAudioLevel(level);
                     }
                 });
+
+                // Mobile Connectivity events
+                this.audioSyncSystem.on('mobileOutputEnabled', () => {
+                    this._updateMobileOutputUI(true);
+                    this.log('Mobile output mode enabled');
+                });
+
+                this.audioSyncSystem.on('mobileOutputDisabled', () => {
+                    this._updateMobileOutputUI(false);
+                    this.log('Mobile output mode disabled');
+                });
+
+                this.audioSyncSystem.on('mobilePeerConnected', (event) => {
+                    this._addMobileDeviceCard(event.peerId);
+                    this.log(`Mobile peer connected: ${event.peerId}`);
+                });
+
+                this.audioSyncSystem.on('mobilePeerDisconnected', (event) => {
+                    this._removeMobileDeviceCard(event.peerId);
+                    this.log(`Mobile peer disconnected: ${event.peerId}`);
+                });
+
+                this.audioSyncSystem.on('mobileAudioStreamingStarted', () => {
+                    this.log('Started streaming audio to mobile devices');
+                });
+
+                this.audioSyncSystem.on('mobileAudioStreamingStopped', () => {
+                    this.log('Stopped streaming audio to mobile devices');
+                });
             }
 
             _setupEventListeners() {
@@ -969,6 +1127,9 @@
                 this.elements.dualOutputToggle.addEventListener('click', () => this._toggleDualOutput());
                 this.elements.startCaptureBtn.addEventListener('click', () => this._startSystemAudioCapture());
                 this.elements.stopCaptureBtn.addEventListener('click', () => this._stopSystemAudioCapture());
+
+                // Mobile Connectivity controls
+                this.elements.mobileOutputToggle.addEventListener('click', () => this._toggleMobileOutput());
 
                 // Audio element events
                 this.currentAudio.addEventListener('loadedmetadata', () => this._updateDuration());
@@ -1340,6 +1501,26 @@
                 } else {
                     this._updateCaptureStatus('System audio capture not supported in this browser.', true);
                 }
+
+                // Update mobile connectivity status
+                if (status.mobileOutputMode) {
+                    this.elements.mobileOutputToggle.classList.add('active');
+                } else {
+                    this.elements.mobileOutputToggle.classList.remove('active');
+                }
+
+                // Update mobile device list
+                const mobileStatus = status.mobileConnectivity;
+                if (mobileStatus && mobileStatus.webrtcSupported) {
+                    if (mobileStatus.connectedPeers.length > 0) {
+                        // Update existing device cards or add new ones
+                        mobileStatus.connectedPeers.forEach(peerId => {
+                            if (!document.getElementById(`mobile-device-${peerId}`)) {
+                                this._addMobileDeviceCard(peerId);
+                            }
+                        });
+                    }
+                }
             }
 
             _updateConnectionStatus(message, isError = false) {
@@ -1442,6 +1623,113 @@
                 this.elements.audioLevelFill.style.width = `${percentage}%`;
             }
 
+            async _toggleMobileOutput() {
+                try {
+                    if (!this.audioSyncSystem.mobileOutputMode) {
+                        // Check if WebRTC is supported
+                        if (!this.audioSyncSystem.isWebRTCSupported()) {
+                            alert('WebRTC is not supported in this browser for mobile connectivity. Please use a modern browser.');
+                            return;
+                        }
+
+                        // Enable mobile output mode
+                        await this.audioSyncSystem.enableMobileOutput(true);
+                        this.elements.mobileOutputToggle.classList.add('active');
+                        
+                        // Show connection information
+                        this._showMobileConnectionInfo();
+                        
+                        this.log('Mobile output mode enabled');
+                        
+                    } else {
+                        // Disable mobile output mode
+                        await this.audioSyncSystem.enableMobileOutput(false);
+                        this.elements.mobileOutputToggle.classList.remove('active');
+                        
+                        this.log('Mobile output mode disabled');
+                    }
+                } catch (error) {
+                    this.log(`Error toggling mobile output: ${error.message}`);
+                    alert(`Error enabling mobile output: ${error.message}`);
+                }
+            }
+
+            _showMobileConnectionInfo() {
+                // Generate connection URL
+                const baseURL = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
+                const mobileURL = baseURL + 'mobile-speaker.html';
+                
+                this.elements.connectionURL.textContent = mobileURL;
+                this.elements.connectionQR.style.display = 'block';
+                
+                this.log(`Mobile connection URL: ${mobileURL}`);
+            }
+
+            _updateMobileOutputUI(enabled) {
+                if (enabled) {
+                    // Show mobile device list area
+                    this.elements.mobileDeviceList.style.display = 'block';
+                    
+                    if (this.audioSyncSystem.isWebRTCSupported()) {
+                        this._showMobileConnectionInfo();
+                    } else {
+                        this.elements.mobileDeviceList.innerHTML = `
+                            <div style="color: #ff6b6b;">
+                                WebRTC not supported in this browser for mobile connectivity.
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Hide mobile device list and connection info
+                    this.elements.mobileDeviceList.style.display = 'none';
+                    this.elements.connectionQR.style.display = 'none';
+                }
+            }
+
+            _addMobileDeviceCard(peerId) {
+                // Remove "no devices" message if present
+                const noDevicesMsg = this.elements.mobileDeviceList.querySelector('div[style*="italic"]');
+                if (noDevicesMsg) {
+                    noDevicesMsg.remove();
+                }
+
+                // Create mobile device card
+                const deviceCard = document.createElement('div');
+                deviceCard.className = 'mobile-device-item fade-in';
+                deviceCard.id = `mobile-device-${peerId}`;
+                
+                deviceCard.innerHTML = `
+                    <div class="device-info">
+                        <div class="device-icon">📱</div>
+                        <div class="device-details">
+                            <div class="device-name">Mobile Device</div>
+                            <div class="device-status" id="status-${peerId}">Connected</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="control-btn" onclick="disconnectMobileDevice('${peerId}')">Disconnect</button>
+                    </div>
+                `;
+                
+                this.elements.mobileDeviceList.appendChild(deviceCard);
+            }
+
+            _removeMobileDeviceCard(peerId) {
+                const deviceCard = document.getElementById(`mobile-device-${peerId}`);
+                if (deviceCard) {
+                    deviceCard.remove();
+                }
+                
+                // Show "no devices" message if no devices connected
+                if (this.elements.mobileDeviceList.children.length === 0) {
+                    this.elements.mobileDeviceList.innerHTML = `
+                        <div style="color: #b8c5d6; font-style: italic;">
+                            No mobile devices connected. Enable mobile output mode to connect tablets/phones.
+                        </div>
+                    `;
+                }
+            }
+
             log(message) {
                 const timestamp = new Date().toLocaleTimeString();
                 console.log(`[${timestamp}] SyncPlay: ${message}`);
@@ -1452,6 +1740,13 @@
         window.speakerCardToggle = function(deviceId) {
             // This would toggle the speaker in the audio sync system
             console.log(`Toggle speaker: ${deviceId}`);
+        };
+
+        // Global function for mobile device disconnection
+        window.disconnectMobileDevice = function(peerId) {
+            if (window.player && window.player.audioSyncSystem) {
+                window.player.audioSyncSystem.disconnectMobilePeer(peerId);
+            }
         };
 
         // Initialize the music player

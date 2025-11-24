@@ -969,6 +969,9 @@
                     connectionURL: document.getElementById('connectionURL')
                 };
 
+                // Mobile broadcast channel
+                this.mobileBroadcastChannel = null;
+
                 this._setupEventListeners();
                 this._setupDragAndDrop();
                 this._initializeSystem();
@@ -1085,11 +1088,13 @@
                 // Mobile Connectivity events
                 this.audioSyncSystem.on('mobileOutputEnabled', () => {
                     this._updateMobileOutputUI(true);
+                    this._setupMobileBroadcastChannel();
                     this.log('Mobile output mode enabled');
                 });
 
                 this.audioSyncSystem.on('mobileOutputDisabled', () => {
                     this._updateMobileOutputUI(false);
+                    this._cleanupMobileBroadcastChannel();
                     this.log('Mobile output mode disabled');
                 });
 
@@ -1647,23 +1652,115 @@
                         // Enable mobile output mode
                         await this.audioSyncSystem.enableMobileOutput(true);
                         this.elements.mobileOutputToggle.classList.add('active');
-                        
+
                         // Show connection information
                         this._showMobileConnectionInfo();
-                        
+
                         this.log('Mobile output mode enabled');
-                        
+
                     } else {
                         // Disable mobile output mode
                         await this.audioSyncSystem.enableMobileOutput(false);
                         this.elements.mobileOutputToggle.classList.remove('active');
-                        
+
                         this.log('Mobile output mode disabled');
                     }
                 } catch (error) {
                     this.log(`Error toggling mobile output: ${error.message}`);
                     alert(`Error enabling mobile output: ${error.message}`);
                 }
+            }
+
+            _setupMobileBroadcastChannel() {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    this.mobileBroadcastChannel = new BroadcastChannel('syncplay-mobile');
+                    this.mobileBroadcastChannel.onmessage = (event) => {
+                        this._handleMobileBroadcastMessage(event.data);
+                    };
+                    this.log.log('Mobile broadcast channel set up');
+                } else {
+                    this.log.error('BroadcastChannel not supported');
+                }
+            }
+
+            _cleanupMobileBroadcastChannel() {
+                if (this.mobileBroadcastChannel) {
+                    this.mobileBroadcastChannel.close();
+                    this.mobileBroadcastChannel = null;
+                    this.log.log('Mobile broadcast channel cleaned up');
+                }
+            }
+
+            async _handleMobileBroadcastMessage(data) {
+                this.log.log('Received mobile broadcast message', data);
+
+                try {
+                    switch (data.type) {
+                        case 'mobile-ready':
+                            await this._handleMobileDeviceReady(data.peerId);
+                            break;
+                        case 'webrtc-answer':
+                            await this._handleWebRTCAnswer(data);
+                            break;
+                        case 'webrtc-answer-candidate':
+                            await this._handleWebRTCAnswerCandidate(data);
+                            break;
+                        default:
+                            this.log.debug('Unknown mobile broadcast message type', data.type);
+                    }
+                } catch (error) {
+                    this.log.error('Error handling mobile broadcast message', { error: error.message, data });
+                }
+            }
+
+            async _handleMobileDeviceReady(peerId) {
+                this.log.log(`Mobile device ready: ${peerId}`);
+
+                try {
+                    // Create connection offer for the mobile device
+                    const offerData = await this.audioSyncSystem.createConnectionOffer(peerId);
+
+                    // Send offer via broadcast channel
+                    if (this.mobileBroadcastChannel) {
+                        this.mobileBroadcastChannel.postMessage({
+                            type: 'webrtc-offer',
+                            peerId: peerId,
+                            offer: offerData.offer
+                        });
+                        this.log.log(`Sent WebRTC offer to mobile device: ${peerId}`);
+                    }
+                } catch (error) {
+                    this.log.error(`Failed to create offer for mobile device ${peerId}`, { error: error.message });
+                }
+            }
+
+            async _handleWebRTCAnswer(data) {
+                const { peerId, answer } = data;
+                this.log.log(`Received WebRTC answer from ${peerId}`);
+
+                try {
+                    await this.audioSyncSystem.acceptConnectionAnswer(peerId, answer);
+                    this.log.log(`WebRTC connection established with ${peerId}`);
+
+                    // Notify mobile device that connection is accepted
+                    if (this.mobileBroadcastChannel) {
+                        this.mobileBroadcastChannel.postMessage({
+                            type: 'webrtc-answer-accepted',
+                            peerId: peerId
+                        });
+                    }
+                } catch (error) {
+                    this.log.error(`Failed to accept WebRTC answer from ${peerId}`, { error: error.message });
+                }
+            }
+
+            async _handleWebRTCAnswerCandidate(data) {
+                const { peerId, candidate } = data;
+                this.log.debug(`Received ICE candidate from ${peerId}`);
+
+                // Add ICE candidate to the peer connection
+                // This would need to be implemented in the WebRTCAudioManager
+                // For now, we'll just log it
             }
 
             _showMobileConnectionInfo() {
@@ -1685,6 +1782,13 @@
 
                 // Clear existing QR code
                 qrContainer.innerHTML = '';
+
+                // Check if QRCode library is loaded
+                if (typeof QRCode === 'undefined') {
+                    console.error('QRCode library not loaded');
+                    qrContainer.innerHTML = '❌ QR library not loaded';
+                    return;
+                }
 
                 // Generate QR code
                 QRCode.toCanvas(url, {

@@ -261,8 +261,20 @@
         </div>
     </div>
 
-    <script type="module">
-        import { logger } from './src/core/utils/Logger.js';
+    <script>
+        /**
+         * Simple logger for mobile speaker
+         */
+        class SimpleLogger {
+            createScopedLogger(scope) {
+                return {
+                    log: (message, data) => console.log(`[${new Date().toLocaleTimeString()}] ${scope}: ${message}`, data || ''),
+                    error: (message, data) => console.error(`[${new Date().toLocaleTimeString()}] ${scope} ERROR: ${message}`, data || ''),
+                    debug: (message, data) => console.debug(`[${new Date().toLocaleTimeString()}] ${scope} DEBUG: ${message}`, data || ''),
+                    info: (message, data) => console.info(`[${new Date().toLocaleTimeString()}] ${scope} INFO: ${message}`, data || '')
+                };
+            }
+        }
 
         /**
          * Mobile Speaker Client
@@ -270,13 +282,15 @@
          */
         class MobileSpeakerClient {
             constructor() {
-                this.log = logger.createScopedLogger('MobileSpeaker');
+                this.logger = new SimpleLogger();
+                this.log = this.logger.createScopedLogger('MobileSpeaker');
                 this.peerConnection = null;
                 this.dataChannel = null;
                 this.audioElement = null;
                 this.isConnected = false;
                 this.deviceId = this._generateDeviceId();
-                
+                this.broadcastChannel = null;
+
                 // UI elements
                 this.elements = {
                     connectBtn: document.getElementById('connectBtn'),
@@ -292,6 +306,7 @@
                 };
 
                 this._initializeUI();
+                this._setupBroadcastChannel();
                 this._setupEventListeners();
             }
 
@@ -300,18 +315,40 @@
                 this._updateConnectionStatus('Ready to connect', false);
             }
 
+            _setupBroadcastChannel() {
+                // Use BroadcastChannel for communication with main app
+                if (typeof BroadcastChannel !== 'undefined') {
+                    this.broadcastChannel = new BroadcastChannel('syncplay-mobile');
+                    this.broadcastChannel.onmessage = (event) => {
+                        this._handleBroadcastMessage(event.data);
+                    };
+                    this.log.log('BroadcastChannel initialized');
+                } else {
+                    this.log.error('BroadcastChannel not supported');
+                    this._updateConnectionStatus('BroadcastChannel not supported', true);
+                }
+            }
+
             _setupEventListeners() {
                 this.elements.connectBtn.addEventListener('click', () => this._connectToLaptop());
                 this.elements.volumeSlider.addEventListener('input', (e) => this._adjustVolume(e.target.value));
                 this.elements.testBtn.addEventListener('click', () => this._playTestTone());
                 this.elements.muteBtn.addEventListener('click', () => this._toggleMute());
+            }
 
-                // Handle incoming messages
-                window.addEventListener('message', (event) => {
-                    if (event.data.type === 'webrtc-offer') {
-                        this._handleConnectionOffer(event.data);
-                    }
-                });
+            _handleBroadcastMessage(data) {
+                this.log.log('Received broadcast message', data);
+
+                switch (data.type) {
+                    case 'webrtc-offer':
+                        this._handleConnectionOffer(data);
+                        break;
+                    case 'webrtc-answer-accepted':
+                        this._updateConnectionStatus('Connection established!', false);
+                        break;
+                    default:
+                        this.log.debug('Unknown broadcast message type', data.type);
+                }
             }
 
             _generateDeviceId() {
@@ -329,6 +366,18 @@
                         throw new Error('WebRTC not supported in this browser');
                     }
 
+                    // Announce mobile device ready via BroadcastChannel
+                    if (this.broadcastChannel) {
+                        this.broadcastChannel.postMessage({
+                            type: 'mobile-ready',
+                            peerId: this.deviceId,
+                            timestamp: Date.now()
+                        });
+                        this.log.log('Announced mobile device ready');
+                    } else {
+                        throw new Error('BroadcastChannel not available');
+                    }
+
                     // Create peer connection
                     this.peerConnection = new RTCPeerConnection({
                         iceServers: [
@@ -340,9 +389,10 @@
                     // Set up event handlers
                     this.peerConnection.onicecandidate = (event) => {
                         if (event.candidate) {
-                            this._sendMessageToParent({ 
-                                type: 'webrtc-answer', 
-                                candidate: event.candidate 
+                            this._sendBroadcastMessage({
+                                type: 'webrtc-answer',
+                                candidate: event.candidate,
+                                peerId: this.deviceId
                             });
                         }
                     };
@@ -392,7 +442,7 @@
                     await this.peerConnection.setLocalDescription(answer);
 
                     // Send answer back to laptop
-                    this._sendMessageToParent({
+                    this._sendBroadcastMessage({
                         type: 'webrtc-answer',
                         peerId: this.deviceId,
                         answer: {
@@ -576,10 +626,13 @@
                 updateLevel();
             }
 
-            _sendMessageToParent(message) {
-                // This would send messages back to the laptop via the communication channel
-                // For now, we'll use console.log as a placeholder
-                console.log('Message to parent:', message);
+            _sendBroadcastMessage(message) {
+                if (this.broadcastChannel) {
+                    this.broadcastChannel.postMessage(message);
+                    this.log.debug('Sent broadcast message', message);
+                } else {
+                    this.log.error('BroadcastChannel not available for sending message');
+                }
             }
 
             disconnect() {

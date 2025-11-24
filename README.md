@@ -115,6 +115,142 @@ Open `index.html` in a supported browser to access the interactive demo:
 - **Real-time Metrics**: Monitor synchronization accuracy and latency
 - **System Logs**: View detailed operation logs
 
+## 🚀 Vercel Deployment
+
+### Overview
+
+This project is configured for easy deployment to Vercel, providing automatic HTTPS support which is required for Web Bluetooth API functionality. The deployment supports both automatic GitHub integration and manual deployment methods.
+
+### Prerequisites
+
+- **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
+- **GitHub Repository** (for automatic deployment): Push your code to GitHub
+- **Vercel CLI** (for manual deployment): `npm install -g vercel`
+
+### Deployment Methods
+
+#### Method 1: Automatic GitHub Integration (Recommended)
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Add Vercel deployment configuration"
+   git push origin main
+   ```
+
+2. **Connect to Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "New Project"
+   - Import your GitHub repository
+   - Vercel will automatically detect the configuration from `vercel.json`
+
+3. **Deploy**
+   - Click "Deploy"
+   - Your site will be available at `https://your-project-name.vercel.app`
+   - Vercel provides automatic HTTPS certificates
+
+#### Method 2: Manual CLI Deployment
+
+1. **Install Vercel CLI**
+   ```bash
+   npm install -g vercel
+   ```
+
+2. **Login to Vercel**
+   ```bash
+   vercel login
+   ```
+
+3. **Deploy**
+   ```bash
+   vercel
+   ```
+
+4. **Follow Prompts**
+   - Set up and deploy: `Yes`
+   - Which scope: Select your account
+   - Link to existing project: `No`
+   - Project name: `web-bluetooth-audio-sync` (or custom)
+   - In which directory: `./` (root directory)
+
+5. **Production Deployment**
+   ```bash
+   vercel --prod
+   ```
+
+### Local Development with Vercel
+
+Run the project locally with Vercel's development server:
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+# or
+vercel dev
+
+# Visit http://localhost:3000
+```
+
+### Vercel Configuration Details
+
+The project includes `vercel.json` with optimal configuration:
+
+- **Static Site Hosting**: Uses `@vercel/static` builder
+- **Security Headers**: Includes CSP, Permissions-Policy for Web Bluetooth
+- **Asset Caching**: Long-term caching for static assets
+- **HTTPS Enforcement**: Required for Web Bluetooth API
+- **Single Page Application**: Proper routing configuration
+
+### Environment Configuration
+
+No special environment variables are required for this static site. The Web Bluetooth API requires HTTPS, which Vercel provides automatically.
+
+### Browser Compatibility on Vercel
+
+| Browser | Support | Notes |
+|---------|---------|--------|
+| **Chrome** | ✅ Full | Recommended browser |
+| **Edge** | ✅ Full | Chromium-based |
+| **Safari** | ⚠️ Limited | iOS 13+, macOS 14.1+ |
+| **Firefox** | ❌ None | Behind experimental flags |
+
+### HTTPS and Web Bluetooth
+
+- **Automatic HTTPS**: Vercel provides free SSL certificates
+- **Web Bluetooth Requirement**: HTTPS is mandatory for Web Bluetooth API
+- **Security Headers**: Configured for Web Bluetooth permissions
+- **Content Security Policy**: Allows necessary permissions for audio/Bluetooth
+
+### Deployment Benefits
+
+- **Global CDN**: Fast loading worldwide
+- **Automatic HTTPS**: Secure connections required for Web Bluetooth
+- **Git Integration**: Automatic deployments on code changes
+- **Custom Domains**: Option to use your own domain
+- **Analytics**: Built-in performance monitoring
+
+### Troubleshooting
+
+1. **Web Bluetooth Not Working**
+   - Ensure you're using HTTPS (provided by Vercel)
+   - Check browser compatibility
+   - Grant Bluetooth permissions when prompted
+
+2. **Deployment Issues**
+   - Verify `vercel.json` configuration
+   - Check that all required files are committed
+   - Review Vercel build logs
+
+3. **Local Development Issues**
+   - Clear browser cache
+   - Use Chrome DevTools to check for errors
+   - Ensure Bluetooth device permissions are granted
+
+For more details on Vercel deployment, visit the [Vercel documentation](https://vercel.com/docs).
+
 ## 🔧 Technical Specifications
 
 ### Synchronization Performance

@@ -1,0 +1,51 @@
+{
+  "name": "web-bluetooth-audio-sync",
+  "version": "1.0.0",
+  "description": "Web Bluetooth Audio Synchronization System - Synchronize audio playback across multiple Bluetooth devices using Web Bluetooth API",
+  "main": "index.html",
+  "keywords": [
+    "web-bluetooth",
+    "audio",
+    "synchronization",
+    "bluetooth",
+    "webaudio",
+    "real-time",
+    "audio-processing"
+  ],
+  "author": {
+    "name": "Web Bluetooth Audio Sync Team",
+    "email": "contact@example.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/web-bluetooth-audio-sync.git"
+  },
+  "homepage": "https://web-bluetooth-audio-sync.vercel.app",
+  "scripts": {
+    "dev": "npx vercel dev",
+    "build": "echo 'Static site - no build required'",
+    "start": "npx vercel dev",
+    "test": "echo 'Tests can be run manually in browser'",
+    "lint": "echo 'No linting configured for static site'",
+    "format": "echo 'Code formatting handled by IDE'"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Edge versions", 
+    "last 2 Safari versions",
+    "last 2 Firefox versions"
+  ],
+  "vercel": {
+    "buildCommand": "echo 'Static site - no build required'",
+    "devCommand": "npx vercel dev",
+    "installCommand": "echo 'No dependencies to install'",
+    "framework": null
+  }
+}

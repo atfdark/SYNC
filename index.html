@@ -972,6 +972,11 @@
                 this._setupEventListeners();
                 this._setupDragAndDrop();
                 this._initializeSystem();
+
+                // Enable mobile output by default for demo
+                setTimeout(() => {
+                    this._toggleMobileOutput();
+                }, 2000);
             }
 
             async _initializeSystem() {
@@ -994,6 +999,11 @@
 
                     // Set up system event handlers
                     this._setupSystemEventHandlers();
+
+                    // Auto-scan and connect to devices for demo
+                    setTimeout(() => {
+                        this._scanForDevices();
+                    }, 1000);
 
                 } catch (error) {
                     this.log(`Initialization error: ${error.message}`);
@@ -1412,9 +1422,10 @@
                     if (availableDevices.length > 0) {
                         const deviceConfigs = availableDevices.map(device => ({
                             name: device.name,
-                            serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb' // A2DP UUID
+                            serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb', // A2DP UUID
+                            isSimulated: device.isSimulated || false
                         }));
-                        
+
                         const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
                         this.log(`Connection results:`, results);
                     }

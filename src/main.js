@@ -388,32 +388,44 @@ class WebBluetoothAudioSync extends EventEmitter {
      * @returns {object} System status
      */
     getSystemStatus() {
-        return {
-            initialized: this.isInitialized,
-            running: this.isRunning,
-            synchronized: this.isSynchronized,
-            activeDevices: this.activeDevices.size,
-            deviceClocks: Array.from(this.deviceClocks.keys()),
-            masterClock: this.masterClock.getStats(),
-            deviceManager: this.deviceManager.getConnectionStats(),
-            driftCorrection: this.driftCorrection.getStats(),
-            audioSync: this.audioSyncEngine.getStats(),
-            bufferManager: this.bufferManager.getStats(),
-            latencyCompensation: this.latencyCompensation.getStats(),
-            systemAudioCapture: {
-                isSupported: this.systemAudioCapture.isSupported(),
-                isCapturing: this.systemAudioCapture.getIsCapturing(),
-                bufferStatus: this.systemAudioCapture.getBufferStatus(),
-                stats: this.systemAudioCapture.getStats()
-            },
-            webrtcManager: this.webrtcManager.getStats(),
-            mobileConnectivity: this.getMobileConnectivityStatus(),
-            dualOutputMode: this.dualOutputMode,
-            mobileOutputMode: this.mobileOutputMode,
-            localAudioOutput: this.localAudioOutput,
-            systemStats: { ...this.systemStats },
-            configuration: { ...this.config }
-        };
+        try {
+            return {
+                initialized: this.isInitialized,
+                running: this.isRunning,
+                synchronized: this.isSynchronized,
+                activeDevices: this.activeDevices.size,
+                deviceClocks: Array.from(this.deviceClocks.keys()),
+                masterClock: this.masterClock.getStats(),
+                deviceManager: this.deviceManager.getConnectionStats(),
+                driftCorrection: this.driftCorrection.getStats(),
+                audioSync: this.audioSyncEngine.getStats(),
+                bufferManager: this.bufferManager.getStats(),
+                latencyCompensation: this.latencyCompensation.getStats(),
+                systemAudioCapture: {
+                    isSupported: this.systemAudioCapture.isSupported(),
+                    isCapturing: this.systemAudioCapture.getIsCapturing(),
+                    bufferStatus: this.systemAudioCapture.getBufferStatus(),
+                    stats: this.systemAudioCapture.getStats()
+                },
+                webrtcManager: this.webrtcManager.getStats(),
+                mobileConnectivity: this.getMobileConnectivityStatus(),
+                dualOutputMode: this.dualOutputMode,
+                mobileOutputMode: this.mobileOutputMode,
+                localAudioOutput: this.localAudioOutput,
+                systemStats: { ...this.systemStats },
+                configuration: { ...this.config }
+            };
+        } catch (error) {
+            this.log.error('Error getting system status', { error: error.message });
+            // Return basic status on error
+            return {
+                initialized: this.isInitialized,
+                running: this.isRunning,
+                synchronized: this.isSynchronized,
+                activeDevices: this.activeDevices.size,
+                error: error.message
+            };
+        }
     }
 
     /**

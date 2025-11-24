@@ -9,8 +9,9 @@ class BluetoothPermissionManager extends EventEmitter {
     constructor(options = {}) {
         super();
         
-        this.isSecureContext = window.location.protocol === 'https:' || 
-                               window.location.hostname === 'localhost';
+        this.isSecureContext = window.location.protocol === 'https:' ||
+                                window.location.hostname === 'localhost' ||
+                                window.location.hostname === '127.0.0.1';
         
         this.supported = !!navigator.bluetooth;
         

@@ -100,3 +100,5 @@ class EventEmitter {
         return this.events.has(event) ? this.events.get(event).size : 0;
     }
 }
+
+export { EventEmitter };

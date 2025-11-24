@@ -924,7 +924,7 @@
                 this.currentAudio = document.getElementById('audioPlayer');
                 this.connectedSpeakers = new Map();
                 this.audioLevelMonitoring = false;
-                
+
                 // UI Elements
                 this.elements = {
                     albumArt: document.getElementById('albumArt'),
@@ -950,7 +950,7 @@
                     speakersGrid: document.getElementById('speakersGrid'),
                     statusIndicator: document.getElementById('statusIndicator'),
                     connectionStatus: document.getElementById('connectionStatus'),
-                    
+
                     // System Audio elements
                     systemAudioSection: document.getElementById('systemAudioSection'),
                     dualOutputToggle: document.getElementById('dualOutputToggle'),
@@ -959,7 +959,7 @@
                     stopCaptureBtn: document.getElementById('stopCaptureBtn'),
                     audioLevelFill: document.getElementById('audioLevelFill'),
                     captureStatus: document.getElementById('captureStatus'),
-                    
+
                     // Mobile Connectivity elements
                     mobileConnectivitySection: document.getElementById('mobileConnectivitySection'),
                     mobileOutputToggle: document.getElementById('mobileOutputToggle'),
@@ -976,7 +976,7 @@
             async _initializeSystem() {
                 try {
                     this.log('Initializing SyncPlay Music Player...');
-                    
+
                     // Initialize the audio sync system
                     this.audioSyncSystem = new WebBluetoothAudioSync({
                         syncTolerance: 1,
@@ -987,13 +987,13 @@
 
                     await this.audioSyncSystem.initialize();
                     this.isInitialized = true;
-                    
+
                     this._updateConnectionStatus('Ready to connect', false);
                     this.log('System initialized successfully');
-                    
+
                     // Set up system event handlers
                     this._setupSystemEventHandlers();
-                    
+
                 } catch (error) {
                     this.log(`Initialization error: ${error.message}`);
                     this._updateConnectionStatus('Initialization failed', true);

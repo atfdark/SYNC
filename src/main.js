@@ -883,8 +883,8 @@ class WebBluetoothAudioSync extends EventEmitter {
             throw new Error('Web Bluetooth is not supported in this browser');
         }
         
-        // Check secure context
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        // Check secure context (allow HTTP for testing)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
             throw new Error('Web Bluetooth requires HTTPS or localhost');
         }
         

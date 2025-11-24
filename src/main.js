@@ -12,6 +12,7 @@ import { DeviceManager } from './core/bluetooth/DeviceManager.js';
 import { AudioSyncEngine } from './core/audio/AudioSyncEngine.js';
 import { BufferManager } from './core/audio/BufferManager.js';
 import { LatencyCompensation } from './core/audio/LatencyCompensation.js';
+import { SystemAudioCapture } from './core/audio/SystemAudioCapture.js';
 
 /**
  * Main Web Bluetooth Audio Sync System
@@ -61,9 +62,20 @@ class WebBluetoothAudioSync extends EventEmitter {
         
         this.latencyCompensation = new LatencyCompensation();
         
+        // System audio capture for dual output
+        this.systemAudioCapture = new SystemAudioCapture({
+            sampleRate: this.config.sampleRate,
+            bufferSize: this.config.bufferSize,
+            monitorVolume: true // Keep system audio playing through laptop speakers
+        });
+        
         // Device tracking
         this.deviceClocks = new Map(); // deviceId -> DeviceClock
         this.activeDevices = new Set();
+        
+        // Dual output configuration
+        this.dualOutputMode = false;
+        this.localAudioOutput = true; // Always allow laptop speakers to play
         
         // System state
         this.isInitialized = false;
@@ -165,6 +177,9 @@ class WebBluetoothAudioSync extends EventEmitter {
         this.log.info('Stopping audio synchronization system');
         
         try {
+            // Stop system audio capture
+            await this.stopSystemAudioCapture();
+            
             // Stop all components
             this.masterClock.stop();
             this.driftCorrection.stop();
@@ -356,9 +371,232 @@ class WebBluetoothAudioSync extends EventEmitter {
             audioSync: this.audioSyncEngine.getStats(),
             bufferManager: this.bufferManager.getStats(),
             latencyCompensation: this.latencyCompensation.getStats(),
+            systemAudioCapture: {
+                isSupported: this.systemAudioCapture.isSupported(),
+                isCapturing: this.systemAudioCapture.getIsCapturing(),
+                bufferStatus: this.systemAudioCapture.getBufferStatus(),
+                stats: this.systemAudioCapture.getStats()
+            },
+            dualOutputMode: this.dualOutputMode,
+            localAudioOutput: this.localAudioOutput,
             systemStats: { ...this.systemStats },
             configuration: { ...this.config }
         };
+    }
+
+    /**
+     * Enable dual output mode (laptop speakers + connected devices)
+     * @param {boolean} enable - Enable dual output
+     */
+    async enableDualOutput(enable = true) {
+        this.dualOutputMode = enable;
+        
+        if (enable) {
+            this.log.info('Enabling dual output mode');
+            this.emit('dualOutputEnabled');
+        } else {
+            this.log.info('Disabling dual output mode');
+            await this.disableSystemAudioCapture();
+            this.emit('dualOutputDisabled');
+        }
+    }
+
+    /**
+     * Check if system audio capture is supported
+     * @returns {boolean} True if supported
+     */
+    isSystemAudioCaptureSupported() {
+        return this.systemAudioCapture.isSupported();
+    }
+
+    /**
+     * Request permission for system audio capture
+     * @returns {Promise<boolean>} True if permission granted
+     */
+    async requestSystemAudioPermission() {
+        if (!this.systemAudioCapture.isSupported()) {
+            throw new Error('System audio capture not supported on this browser');
+        }
+
+        try {
+            const granted = await this.systemAudioCapture.requestPermission();
+            if (granted) {
+                this.emit('systemAudioPermissionGranted');
+            }
+            return granted;
+        } catch (error) {
+            this.emit('systemAudioPermissionDenied', { error });
+            throw error;
+        }
+    }
+
+    /**
+     * Start capturing system audio for dual output
+     * @returns {Promise<void>}
+     */
+    async startSystemAudioCapture() {
+        if (!this.dualOutputMode) {
+            throw new Error('Dual output mode must be enabled first');
+        }
+
+        if (!this.systemAudioCapture.getIsCapturing()) {
+            try {
+                await this.systemAudioCapture.startCapture();
+                this.emit('systemAudioCaptureStarted');
+                
+                // Set up audio frame processing
+                this.systemAudioCapture.on('audioFrame', (event) => {
+                    this._processSystemAudioFrame(event);
+                });
+                
+                this.log.info('System audio capture started for dual output');
+                
+            } catch (error) {
+                this.log.error('Failed to start system audio capture', { error: error.message });
+                throw error;
+            }
+        }
+    }
+
+    /**
+     * Stop capturing system audio
+     */
+    async stopSystemAudioCapture() {
+        if (this.systemAudioCapture.getIsCapturing()) {
+            this.systemAudioCapture.stopCapture();
+            this.emit('systemAudioCaptureStopped');
+            this.log.info('System audio capture stopped');
+        }
+    }
+
+    /**
+     * Disable system audio capture completely
+     */
+    async disableSystemAudioCapture() {
+        await this.stopSystemAudioCapture();
+        this.dualOutputMode = false;
+        this.emit('systemAudioCaptureDisabled');
+    }
+
+    /**
+     * Process system audio frame for synchronization
+     * @param {object} audioFrame - Audio frame data
+     * @private
+     */
+    _processSystemAudioFrame(audioFrame) {
+        // Add to buffer manager for synchronization
+        if (this.activeDevices.size > 0) {
+            const deviceIds = Array.from(this.activeDevices);
+            
+            for (const deviceId of deviceIds) {
+                // Send the same audio frame to all connected devices
+                this.bufferManager.writeAudioData(
+                    deviceId,
+                    audioFrame.data.buffer,
+                    audioFrame.timestamp
+                );
+            }
+        }
+        
+        this.emit('systemAudioFrameProcessed', audioFrame);
+    }
+
+    /**
+     * Start synchronized playback with system audio
+     * @param {object} playbackOptions - Playback options
+     * @returns {Promise<object>} Playback session
+     */
+    async startSynchronizedSystemAudioPlayback(playbackOptions = {}) {
+        if (!this.dualOutputMode) {
+            throw new Error('Dual output mode must be enabled');
+        }
+
+        if (!this.systemAudioCapture.isSupported()) {
+            throw new Error('System audio capture not supported');
+        }
+
+        this.log.info('Starting synchronized system audio playback');
+
+        try {
+            // Ensure system audio is being captured
+            if (!this.systemAudioCapture.getIsCapturing()) {
+                await this.startSystemAudioCapture();
+            }
+
+            // Start audio sync engine if not running
+            if (!this.audioSyncEngine.isRunning) {
+                await this.audioSyncEngine.start();
+            }
+
+            // Create playback session
+            const sessionId = this._generateSessionId();
+            const session = {
+                id: sessionId,
+                type: 'system_audio',
+                options: playbackOptions,
+                startTime: null,
+                devices: new Set(this.activeDevices)
+            };
+
+            // Set up synchronization for all devices
+            const masterStartTime = this.masterClock.getSyncTime();
+            
+            // Add a "virtual device" representing the system audio source
+            const systemDeviceId = 'system_audio_source';
+            this.audioSyncEngine.addDevice(systemDeviceId);
+
+            session.startTime = masterStartTime;
+            session.systemDeviceId = systemDeviceId;
+
+            this.systemStats.activeSyncSessions++;
+            this.isSynchronized = true;
+
+            this.log.info('Synchronized system audio playback started', { 
+                sessionId, 
+                deviceCount: this.activeDevices.size 
+            });
+
+            this.emit('systemAudioPlaybackStarted', { 
+                sessionId, 
+                devices: Array.from(this.activeDevices),
+                startTime: masterStartTime 
+            });
+
+            return session;
+
+        } catch (error) {
+            this.log.error('Failed to start synchronized system audio playback', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
+     * Stop synchronized system audio playback
+     * @param {string} sessionId - Playback session identifier
+     * @returns {Promise<boolean>} Success status
+     */
+    async stopSynchronizedSystemAudioPlayback(sessionId) {
+        this.log.info('Stopping synchronized system audio playback', { sessionId });
+
+        try {
+            // Stop system audio capture
+            await this.stopSystemAudioCapture();
+
+            this.systemStats.activeSyncSessions = Math.max(0, this.systemStats.activeSyncSessions - 1);
+
+            if (this.systemStats.activeSyncSessions === 0) {
+                this.isSynchronized = false;
+            }
+
+            this.log.info('Synchronized system audio playback stopped', { sessionId });
+            this.emit('systemAudioPlaybackStopped', { sessionId });
+
+            return true;
+
+        } catch (error) {
+            this.log.error('Error stopping system audio playback', { sessionId, error: error.message });
+            return false;
+        }
     }
 
     /**
@@ -404,7 +642,9 @@ class WebBluetoothAudioSync extends EventEmitter {
             averageAccuracy: Math.round(averageAccuracy),
             deviceCount: deviceQualities.length,
             devices: deviceQualities,
-            systemQuality: this.driftCorrection.getSystemQuality()
+            systemQuality: this.driftCorrection.getSystemQuality(),
+            dualOutputMode: this.dualOutputMode,
+            systemAudioSupported: this.systemAudioCapture.isSupported()
         };
     }
 
@@ -471,6 +711,11 @@ class WebBluetoothAudioSync extends EventEmitter {
         // Drift Correction events
         this.driftCorrection.on('correctionsApplied', (event) => {
             this._handleDriftCorrectionsApplied(event);
+        });
+        
+        // System Audio Capture events
+        this.systemAudioCapture.on('audioFrame', (event) => {
+            // Audio frames are processed in _processSystemAudioFrame
         });
     }
 

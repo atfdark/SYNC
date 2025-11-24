@@ -27,6 +27,7 @@ This system addresses the complex challenge of playing synchronized audio across
 - **AudioSyncEngine**: Master synchronization algorithms
 - **BufferManager**: Circular buffer management with drift correction
 - **LatencyCompensation**: Network latency measurement and compensation
+- **SystemAudioCapture**: System audio capture for dual output (laptop + devices)
 
 ### Utilities (`src/core/utils/`)
 - **EventEmitter**: Event-driven communication system
@@ -52,6 +53,12 @@ This system addresses the complex challenge of playing synchronized audio across
 - Browser compatibility handling (Chrome/Edge, Safari)
 - Graceful fallback for unsupported browsers
 - Automatic reconnection on disconnection
+
+### ✅ System Audio Capture & Dual Output
+- Capture audio from any application playing on the laptop (Spotify, YouTube, etc.)
+- Simultaneous playback through laptop speakers AND connected Bluetooth devices
+- Real-time audio level monitoring
+- Compatible with Chromium-based browsers (Chrome, Edge) over HTTPS
 
 ### ✅ Performance Monitoring
 - Real-time synchronization quality metrics
@@ -91,9 +98,14 @@ const deviceConfigs = [
 
 await audioSync.connectDevices(deviceConfigs);
 
-// Start synchronized playback
+// Start synchronized playback with audio files
 const audioData = new ArrayBuffer(/* your audio data */);
 const session = await audioSync.startSynchronizedPlayback(audioData);
+
+// OR: Enable dual output to capture system audio (Spotify, etc.)
+await audioSync.enableDualOutput(true);
+await audioSync.requestSystemAudioPermission();
+await audioSync.startSystemAudioCapture();
 ```
 
 ### 3. Browser Compatibility
@@ -111,9 +123,36 @@ Open `index.html` in a supported browser to access the interactive demo:
 
 - **System Controls**: Initialize, start/stop the synchronization system
 - **Device Management**: Connect and manage Bluetooth devices
+- **System Audio Capture**: Enable dual output to play any system audio through both laptop speakers and connected devices
 - **Audio Controls**: Start/stop test playback sessions
 - **Real-time Metrics**: Monitor synchronization accuracy and latency
 - **System Logs**: View detailed operation logs
+
+## 🎧 System Audio Capture (NEW!)
+
+### What it does
+This feature allows you to capture audio from ANY application playing on your laptop (Spotify, YouTube, Netflix, games, etc.) and play it simultaneously through:
+1. **Your laptop's built-in speakers**
+2. **All connected Bluetooth devices** (speakers, headphones, etc.)
+
+### How to use
+1. **Open the demo interface** in Chrome or Edge (over HTTPS)
+2. **Connect your Bluetooth devices** using "Scan & Connect"
+3. **Enable "Dual Output Mode"** using the toggle switch
+4. **Click "Start System Audio Capture"** and grant permission when prompted
+5. **Play any audio** on your laptop - it will come out of ALL speakers simultaneously!
+
+### Requirements
+- **Chromium-based browser** (Chrome, Edge) - Firefox and Safari don't support system audio capture
+- **HTTPS connection** - Required for getDisplayMedia API
+- **User permission** - Browser will ask for screen/audio capture permission
+- **Active audio playback** - Any sound playing on the system will be captured and synchronized
+
+### Perfect for
+- **Music streaming** through Spotify/Apple Music while using Bluetooth speakers
+- **Movie watching** with both laptop speakers and external audio system
+- **Gaming audio** with synchronized multi-speaker setup
+- **Video calls** heard through both laptop and conference room speakers
 
 ## 🚀 Vercel Deployment
 
@@ -317,6 +356,8 @@ web-bluetooth-audio-sync/
 - **`AudioSyncEngine`**: Synchronization algorithms
 - **`BufferManager`**: Audio buffer handling
 - **`DriftCorrection`**: Clock drift compensation
+- **`SystemAudioCapture`**: System audio capture for dual output
+- **`LatencyCompensation`**: Network latency measurement and compensation
 
 ## 🔬 Architecture Highlights
 

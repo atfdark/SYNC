@@ -476,6 +476,94 @@
             display: none;
         }
 
+        /* System Audio Section */
+        .system-audio-section {
+            margin: 30px 0;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .dual-output-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .dual-output-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .system-audio-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .capture-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: #ffffff;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        .capture-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .capture-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .stop-capture-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .stop-capture-btn:hover {
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .audio-level-indicator {
+            width: 100px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .audio-level-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #ff6b6b);
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .system-audio-info {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #b8c5d6;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .player-main {
@@ -645,6 +733,43 @@
             </div>
         </section>
 
+        <!-- System Audio Section -->
+        <section class="system-audio-section" id="systemAudioSection">
+            <div class="fade-in">
+                <h3 style="margin-bottom: 20px;">🎧 System Audio Capture</h3>
+                
+                <!-- Dual Output Toggle -->
+                <div class="dual-output-toggle">
+                    <div class="toggle-switch" id="dualOutputToggle">
+                        <div class="toggle-handle"></div>
+                    </div>
+                    <span class="dual-output-label">Play through laptop speakers + connected devices</span>
+                </div>
+
+                <!-- System Audio Controls -->
+                <div class="system-audio-controls" id="systemAudioControls" style="display: none;">
+                    <button class="capture-btn" id="startCaptureBtn">
+                        📥 Start System Audio Capture
+                    </button>
+                    <button class="capture-btn stop-capture-btn" id="stopCaptureBtn" style="display: none;">
+                        ⏹️ Stop Capture
+                    </button>
+                    
+                    <!-- Audio Level Indicator -->
+                    <div class="audio-level-indicator">
+                        <div class="audio-level-fill" id="audioLevelFill"></div>
+                    </div>
+                </div>
+
+                <div class="system-audio-info" id="systemAudioInfo">
+                    <p>Enable dual output to play audio through both your laptop speakers and connected Bluetooth devices simultaneously.</p>
+                    <p id="captureStatus" style="margin-top: 10px; font-size: 12px; color: #888;">
+                        System audio capture requires permission and browser support.
+                    </p>
+                </div>
+            </div>
+        </section>
+
         <!-- Speakers Section -->
         <section class="speakers-section">
             <div class="section-header">
@@ -676,6 +801,7 @@
                 this.playlist = [];
                 this.currentAudio = document.getElementById('audioPlayer');
                 this.connectedSpeakers = new Map();
+                this.audioLevelMonitoring = false;
                 
                 // UI Elements
                 this.elements = {
@@ -701,7 +827,16 @@
                     scanBtn: document.getElementById('scanBtn'),
                     speakersGrid: document.getElementById('speakersGrid'),
                     statusIndicator: document.getElementById('statusIndicator'),
-                    connectionStatus: document.getElementById('connectionStatus')
+                    connectionStatus: document.getElementById('connectionStatus'),
+                    
+                    // System Audio elements
+                    systemAudioSection: document.getElementById('systemAudioSection'),
+                    dualOutputToggle: document.getElementById('dualOutputToggle'),
+                    systemAudioControls: document.getElementById('systemAudioControls'),
+                    startCaptureBtn: document.getElementById('startCaptureBtn'),
+                    stopCaptureBtn: document.getElementById('stopCaptureBtn'),
+                    audioLevelFill: document.getElementById('audioLevelFill'),
+                    captureStatus: document.getElementById('captureStatus')
                 };
 
                 this._setupEventListeners();
@@ -758,6 +893,54 @@
                 this.audioSyncSystem.on('playbackStopped', (event) => {
                     this.log(`Synchronized playback stopped: ${event.sessionId}`);
                 });
+
+                // System Audio events
+                this.audioSyncSystem.on('dualOutputEnabled', () => {
+                    this._updateSystemAudioUI(true);
+                    this.log('Dual output mode enabled');
+                });
+
+                this.audioSyncSystem.on('dualOutputDisabled', () => {
+                    this._updateSystemAudioUI(false);
+                    this._stopSystemAudioCapture();
+                    this.log('Dual output mode disabled');
+                });
+
+                this.audioSyncSystem.on('systemAudioPermissionGranted', () => {
+                    this._updateCaptureStatus('Permission granted. Ready to capture system audio.', false);
+                    this.elements.startCaptureBtn.style.display = 'inline-block';
+                });
+
+                this.audioSyncSystem.on('systemAudioPermissionDenied', (event) => {
+                    this._updateCaptureStatus(`Permission denied: ${event.error.message}`, true);
+                    this.elements.startCaptureBtn.style.display = 'none';
+                });
+
+                this.audioSyncSystem.on('systemAudioCaptureStarted', () => {
+                    this._updateCaptureStatus('System audio capture active - audio playing through both laptop and connected speakers!', false);
+                    this.elements.startCaptureBtn.style.display = 'none';
+                    this.elements.stopCaptureBtn.style.display = 'inline-block';
+                    
+                    // Start audio level monitoring
+                    this._startAudioLevelMonitoring();
+                });
+
+                this.audioSyncSystem.on('systemAudioCaptureStopped', () => {
+                    this._updateCaptureStatus('System audio capture stopped', false);
+                    this.elements.startCaptureBtn.style.display = this.audioSyncSystem.dualOutputMode ? 'inline-block' : 'none';
+                    this.elements.stopCaptureBtn.style.display = 'none';
+                    
+                    // Stop audio level monitoring
+                    this._stopAudioLevelMonitoring();
+                });
+
+                this.audioSyncSystem.on('systemAudioFrameProcessed', (event) => {
+                    // Update audio level indicator if monitoring is active
+                    if (this.audioLevelMonitoring) {
+                        const level = this.audioSyncSystem.systemAudioCapture.getAudioLevel();
+                        this._updateAudioLevel(level);
+                    }
+                });
             }
 
             _setupEventListeners() {
@@ -781,6 +964,11 @@
 
                 // Scan for devices
                 this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
+
+                // System Audio controls
+                this.elements.dualOutputToggle.addEventListener('click', () => this._toggleDualOutput());
+                this.elements.startCaptureBtn.addEventListener('click', () => this._startSystemAudioCapture());
+                this.elements.stopCaptureBtn.addEventListener('click', () => this._stopSystemAudioCapture());
 
                 // Audio element events
                 this.currentAudio.addEventListener('loadedmetadata', () => this._updateDuration());
@@ -1139,11 +1327,119 @@
                 } else {
                     this._updateConnectionStatus('Ready to connect', false);
                 }
+
+                // Update system audio status
+                if (status.dualOutputMode) {
+                    this.elements.dualOutputToggle.classList.add('active');
+                } else {
+                    this.elements.dualOutputToggle.classList.remove('active');
+                }
+
+                if (status.systemAudioCapture?.isSupported) {
+                    this._updateCaptureStatus('System audio capture supported. Enable dual output to use.', false);
+                } else {
+                    this._updateCaptureStatus('System audio capture not supported in this browser.', true);
+                }
             }
 
             _updateConnectionStatus(message, isError = false) {
                 this.elements.connectionStatus.textContent = message;
                 this.elements.statusIndicator.className = isError ? 'status-indicator disconnected' : 'status-indicator';
+            }
+
+            async _toggleDualOutput() {
+                try {
+                    if (!this.audioSyncSystem.dualOutputMode) {
+                        // Check if system audio capture is supported
+                        if (!this.audioSyncSystem.isSystemAudioCaptureSupported()) {
+                            alert('System audio capture is not supported in this browser. Please use a Chromium-based browser (Chrome, Edge) and run over HTTPS.');
+                            return;
+                        }
+
+                        // Enable dual output mode
+                        await this.audioSyncSystem.enableDualOutput(true);
+                        this.elements.dualOutputToggle.classList.add('active');
+                        
+                        this.log('Dual output mode enabled');
+                        
+                    } else {
+                        // Disable dual output mode
+                        await this.audioSyncSystem.enableDualOutput(false);
+                        this.elements.dualOutputToggle.classList.remove('active');
+                        
+                        this.log('Dual output mode disabled');
+                    }
+                } catch (error) {
+                    this.log(`Error toggling dual output: ${error.message}`);
+                    alert(`Error enabling dual output: ${error.message}`);
+                }
+            }
+
+            async _startSystemAudioCapture() {
+                try {
+                    if (!this.audioSyncSystem.dualOutputMode) {
+                        alert('Please enable dual output mode first');
+                        return;
+                    }
+
+                    // Request permission
+                    await this.audioSyncSystem.requestSystemAudioPermission();
+                    
+                    // Start capture
+                    await this.audioSyncSystem.startSystemAudioCapture();
+                    
+                    this.log('System audio capture started');
+                    
+                } catch (error) {
+                    this.log(`Failed to start system audio capture: ${error.message}`);
+                    this._updateCaptureStatus(`Failed to start capture: ${error.message}`, true);
+                }
+            }
+
+            async _stopSystemAudioCapture() {
+                try {
+                    await this.audioSyncSystem.stopSystemAudioCapture();
+                    this.log('System audio capture stopped');
+                } catch (error) {
+                    this.log(`Failed to stop system audio capture: ${error.message}`);
+                }
+            }
+
+            _updateSystemAudioUI(enabled) {
+                if (enabled) {
+                    this.elements.systemAudioControls.style.display = 'flex';
+                    
+                    // Check if system audio capture is supported
+                    if (this.audioSyncSystem.isSystemAudioCaptureSupported()) {
+                        this.elements.startCaptureBtn.style.display = 'inline-block';
+                        this._updateCaptureStatus('Ready to capture system audio. Click "Start System Audio Capture" to begin.', false);
+                    } else {
+                        this._updateCaptureStatus('System audio capture not supported in this browser.', true);
+                        this.elements.startCaptureBtn.style.display = 'none';
+                    }
+                } else {
+                    this.elements.systemAudioControls.style.display = 'none';
+                }
+            }
+
+            _updateCaptureStatus(message, isError) {
+                this.elements.captureStatus.textContent = message;
+                this.elements.captureStatus.style.color = isError ? '#ff6b6b' : '#b8c5d6';
+            }
+
+            _startAudioLevelMonitoring() {
+                this.audioLevelMonitoring = true;
+                this._updateAudioLevel(0);
+            }
+
+            _stopAudioLevelMonitoring() {
+                this.audioLevelMonitoring = false;
+                this._updateAudioLevel(0);
+            }
+
+            _updateAudioLevel(level) {
+                const percentage = Math.round(level * 100);
+                this.elements.audioLevelFill.style.width = `${percentage}%`;
             }
 
             log(message) {

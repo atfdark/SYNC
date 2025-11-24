@@ -3,212 +3,543 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Web Bluetooth Audio Synchronization System - Synchronize audio playback across multiple Bluetooth devices using advanced timing algorithms and Web Bluetooth API">
-    <meta name="keywords" content="web-bluetooth, audio, synchronization, bluetooth, webaudio, real-time">
-    <meta name="author" content="Web Bluetooth Audio Sync Team">
-    <link rel="icon" type="image/x-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2IDJMMTMuNSA1LjVMMTEgNkw5IDlMMTEgMTIuNUwxMy41IDE1TDE2IDEyTDExIDEyTDExIDhMMjIgMTNMMjIgMTBMMTYgMloiIGZpbGw9IiMwMDdiZmYiLz4KPC9zdmc+">
-    <title>Web Bluetooth Audio Synchronization Demo</title>
+    <meta name="description" "SyncPlay - Multi-Speaker Bluetooth Audio Synchronization">
+    <title>SyncPlay - Multi-Speaker Music Player</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2IDJMMTMuNSA1LjVMMTEgNkw5IDlMMTEgMTIuNUwxMy41IDE1TDE2IDEyTDExIDEyTDExIDhMMjIgMTNMMjIgMTBMMTYgMloiIGZpbGw9IiMwMDdiZmYiLz4KPC9zdmc+">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .player-container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            color: #333;
-            text-align: center;
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
             margin-bottom: 30px;
-            font-size: 2.5em;
         }
 
-        .status-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            border-left: 4px solid #007bff;
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        .device-section {
-            background: #e9ecef;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
+        .bluetooth-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .controls {
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: #ff6b6b;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Player */
+        .player-main {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
         }
 
-        .control-group {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        /* Album Art Section */
+        .album-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
         }
 
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background: #0056b3;
-        }
-
-        button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-
-        .danger {
-            background: #dc3545;
-        }
-
-        .danger:hover {
-            background: #c82333;
-        }
-
-        .success {
-            background: #28a745;
-        }
-
-        .success:hover {
-            background: #218838;
-        }
-
-        .warning {
-            background: #ffc107;
-            color: #212529;
-        }
-
-        .warning:hover {
-            background: #e0a800;
-        }
-
-        .log-area {
-            background: #1a1a1a;
-            color: #00ff00;
-            border-radius: 8px;
-            padding: 15px;
+        .album-art {
+            width: 300px;
             height: 300px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            margin: 20px 0;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
         }
 
-        .device-item {
-            background: white;
-            border-radius: 6px;
-            padding: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #28a745;
+        .album-art:hover {
+            transform: scale(1.02);
         }
 
-        .device-item.disconnected {
-            border-left-color: #dc3545;
+        .album-art.has-art {
+            background-size: cover;
+            background-position: center;
         }
 
-        .quality-indicator {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+        .album-art-placeholder {
+            font-size: 64px;
+            color: rgba(255, 255, 255, 0.6);
         }
 
-        .quality-excellent {
-            background: #d4edda;
-            color: #155724;
+        .album-info {
+            text-align: center;
+            width: 100%;
         }
 
-        .quality-good {
-            background: #d1ecf1;
-            color: #0c5460;
+        .song-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
         }
 
-        .quality-fair {
-            background: #fff3cd;
-            color: #856404;
+        .song-artist {
+            font-size: 16px;
+            color: #b8c5d6;
+            margin-bottom: 20px;
         }
 
-        .quality-poor {
-            background: #f8d7da;
-            color: #721c24;
+        /* Controls Section */
+        .controls-section {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
         }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        .main-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .control-btn.primary {
+            width: 80px;
+            height: 80px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+        }
+
+        .control-btn.primary:hover {
+            background: linear-gradient(135deg, #ee5a52, #ff6b6b);
+        }
+
+        .secondary-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .secondary-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #b8c5d6;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+
+        .secondary-btn.active {
+            background: #4ecdc4;
+            color: #1a1a2e;
+        }
+
+        /* Progress Bar */
+        .progress-section {
+            display: flex;
+            align-items: center;
             gap: 15px;
             margin: 20px 0;
         }
 
-        .metric-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
+        .time-display {
+            font-size: 14px;
+            color: #b8c5d6;
+            min-width: 40px;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .metric-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #007bff;
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
         }
 
-        .metric-label {
-            color: #6c757d;
-            font-size: 0.9em;
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #45b7d1);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.1s ease;
         }
 
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            border-radius: 6px;
-            padding: 12px;
-            margin: 10px 0;
+        .progress-handle {
+            position: absolute;
+            top: -6px;
+            width: 18px;
+            height: 18px;
+            background: #ffffff;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
-        .info-message {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-            border-radius: 6px;
-            padding: 12px;
-            margin: 10px 0;
+        .progress-bar:hover .progress-handle {
+            opacity: 1;
         }
 
-        .loading {
+        /* Volume Control */
+        .volume-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .volume-icon {
+            font-size: 18px;
+            color: #b8c5d6;
+        }
+
+        .volume-slider {
+            flex: 1;
+            max-width: 200px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .volume-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+            border-radius: 3px;
+            width: 75%;
+            transition: width 0.1s ease;
+        }
+
+        .volume-handle {
+            position: absolute;
+            top: -6px;
+            width: 18px;
+            height: 18px;
+            background: #ffffff;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .volume-slider:hover .volume-handle {
+            opacity: 1;
+        }
+
+        /* Speaker Section */
+        .speakers-section {
+            margin-top: 40px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .scan-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #4ecdc4, #45b7d1);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .scan-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(78, 205, 196, 0.4);
+        }
+
+        .speakers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .speaker-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .speaker-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .speaker-card.connected {
+            border-color: #4ecdc4;
+            background: rgba(78, 205, 196, 0.1);
+        }
+
+        .speaker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .speaker-name {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .speaker-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+
+        .speaker-status.connected {
+            background: #4ecdc4;
+        }
+
+        .speaker-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .speaker-toggle {
+            flex: 1;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: #4ecdc4;
+        }
+
+        .toggle-handle {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background: #ffffff;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch.active .toggle-handle {
+            transform: translateX(25px);
+        }
+
+        /* File Input Section */
+        .file-input-section {
+            margin: 30px 0;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-section:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .file-input-section.dragover {
+            background: rgba(78, 205, 196, 0.1);
+            border-color: #4ecdc4;
+        }
+
+        .file-input-label {
+            cursor: pointer;
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #007bff;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #ffffff;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .player-main {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .album-art {
+                width: 250px;
+                height: 250px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .speakers-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 16px;
+            }
+
+            .control-btn.primary {
+                width: 70px;
+                height: 70px;
+                font-size: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .player-container {
+                padding: 15px;
+            }
+
+            .album-art {
+                width: 200px;
+                height: 200px;
+            }
+
+            .album-art-placeholder {
+                font-size: 48px;
+            }
+
+            .song-title {
+                font-size: 20px;
+            }
+        }
+
+        /* Hidden audio element */
+        #audioPlayer {
+            display: none;
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #4ecdc4;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -217,538 +548,619 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Utility classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎵 Web Bluetooth Audio Synchronization</h1>
-        
-        <!-- System Status -->
-        <div class="status-section">
-            <h3>📊 System Status</h3>
-            <div id="system-status">
-                <div class="info-message">Click "Initialize System" to start</div>
+    <div class="player-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">🎵 SyncPlay</div>
+            <div class="bluetooth-status">
+                <div class="status-indicator disconnected" id="statusIndicator"></div>
+                <span id="connectionStatus">Ready to connect</span>
             </div>
-            
-            <div class="metrics-grid" id="metrics-grid" style="display: none;">
-                <div class="metric-card">
-                    <div class="metric-value" id="connected-devices">0</div>
-                    <div class="metric-label">Connected Devices</div>
+        </header>
+
+        <!-- Main Player -->
+        <main class="player-main">
+            <!-- Album Section -->
+            <section class="album-section">
+                <div class="album-art" id="albumArt">
+                    <div class="album-art-placeholder" id="albumPlaceholder">🎵</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value" id="sync-accuracy">0%</div>
-                    <div class="metric-label">Sync Accuracy</div>
+                <div class="album-info">
+                    <div class="song-title" id="songTitle">Select a song to play</div>
+                    <div class="song-artist" id="songArtist">No artist</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value" id="average-latency">0ms</div>
-                    <div class="metric-label">Avg Latency</div>
+            </section>
+
+            <!-- Controls Section -->
+            <section class="controls-section">
+                <!-- Main Controls -->
+                <div class="main-controls">
+                    <button class="secondary-btn" id="shuffleBtn" title="Shuffle">
+                        🔀
+                    </button>
+                    <button class="control-btn" id="prevBtn" title="Previous">
+                        ⏮️
+                    </button>
+                    <button class="control-btn primary" id="playPauseBtn" title="Play/Pause">
+                        ▶️
+                    </button>
+                    <button class="control-btn" id="nextBtn" title="Next">
+                        ⏭️
+                    </button>
+                    <button class="secondary-btn" id="repeatBtn" title="Repeat">
+                        🔁
+                    </button>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value" id="active-sessions">0</div>
-                    <div class="metric-label">Active Sessions</div>
+
+                <!-- Progress Bar -->
+                <div class="progress-section">
+                    <span class="time-display" id="currentTime">0:00</span>
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                        <div class="progress-handle" id="progressHandle"></div>
+                    </div>
+                    <span class="time-display" id="duration">0:00</span>
                 </div>
+
+                <!-- Volume Control -->
+                <div class="volume-section">
+                    <span class="volume-icon">🔊</span>
+                    <div class="volume-slider" id="volumeSlider">
+                        <div class="volume-fill" id="volumeFill"></div>
+                        <div class="volume-handle" id="volumeHandle"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- File Input Section -->
+        <section class="file-input-section" id="fileInputSection">
+            <div class="fade-in">
+                <h3 style="margin-bottom: 15px;">Choose Your Music</h3>
+                <p style="color: #b8c5d6; margin-bottom: 20px;">Select audio files or drag them here</p>
+                <label for="fileInput" class="file-input-label">
+                    📁 Browse Files
+                </label>
+                <input type="file" id="fileInput" class="file-input" accept="audio/*" multiple>
+                <p style="font-size: 12px; color: #888; margin-top: 15px;">
+                    Supports MP3, WAV, OGG, M4A, and other audio formats
+                </p>
             </div>
-        </div>
+        </section>
 
-        <!-- Device Management -->
-        <div class="device-section">
-            <h3>🔗 Device Management</h3>
-            <div id="device-list">
-                <div class="info-message">No devices connected yet</div>
+        <!-- Speakers Section -->
+        <section class="speakers-section">
+            <div class="section-header">
+                <h2 class="section-title">🔊 Connected Speakers</h2>
+                <button class="scan-btn" id="scanBtn">Scan & Connect</button>
             </div>
-        </div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <div class="control-group">
-                <h4>🚀 System Control</h4>
-                <button id="init-btn" onclick="initializeSystem()">Initialize System</button>
-                <button id="start-btn" onclick="startSystem()" disabled>Start System</button>
-                <button id="stop-btn" onclick="stopSystem()" disabled>Stop System</button>
+            <div class="speakers-grid" id="speakersGrid">
+                <!-- Speaker cards will be dynamically added here -->
             </div>
-
-            <div class="control-group">
-                <h4>📱 Device Connection</h4>
-                <button onclick="connectSampleDevices()">Connect Sample Devices</button>
-                <button onclick="scanForDevices()">Scan for Devices</button>
-                <button onclick="disconnectAllDevices()" class="danger" disabled>Disconnect All</button>
-            </div>
-
-            <div class="control-group">
-                <h4>🎵 Audio Control</h4>
-                <button onclick="startTestPlayback()" class="success" disabled>Start Test Playback</button>
-                <button onclick="stopTestPlayback()" class="danger" disabled>Stop Playback</button>
-                <button onclick="testSynchronization()">Test Sync Quality</button>
-            </div>
-
-            <div class="control-group">
-                <h4>📈 Monitoring</h4>
-                <button onclick="updateStatus()">Refresh Status</button>
-                <button onclick="showSystemInfo()">System Info</button>
-                <button onclick="exportLogs()">Export Logs</button>
-            </div>
-        </div>
-
-        <!-- System Info -->
-        <div id="system-info" style="display: none;">
-            <h3>ℹ️ System Information</h3>
-            <div id="info-content"></div>
-        </div>
-
-        <!-- Log Area -->
-        <div>
-            <h3>📋 System Logs</h3>
-            <div class="log-area" id="log-area"></div>
-            <button onclick="clearLogs()" class="warning">Clear Logs</button>
-        </div>
+        </section>
     </div>
 
+    <!-- Hidden Audio Player -->
+    <audio id="audioPlayer" preload="metadata"></audio>
+
     <script type="module">
-        // Import the main system (would be loaded from build output)
-        // For demo purposes, we'll create a mock system
-        
-        class MockWebBluetoothAudioSync {
+        // Import the main system
+        import { WebBluetoothAudioSync } from './src/main.js';
+
+        /**
+         * Music Player with Multi-Speaker Synchronization
+         */
+        class SyncPlayMusicPlayer {
             constructor() {
+                this.audioSyncSystem = null;
                 this.isInitialized = false;
-                this.isRunning = false;
-                this.devices = new Map();
-                this.logs = [];
-                this.systemStats = {
-                    connectedDevices: 0,
-                    syncAccuracy: 0,
-                    averageLatency: 0,
-                    activeSessions: 0
+                this.isPlaying = false;
+                this.currentSongIndex = 0;
+                this.playlist = [];
+                this.currentAudio = document.getElementById('audioPlayer');
+                this.connectedSpeakers = new Map();
+                
+                // UI Elements
+                this.elements = {
+                    albumArt: document.getElementById('albumArt'),
+                    albumPlaceholder: document.getElementById('albumPlaceholder'),
+                    songTitle: document.getElementById('songTitle'),
+                    songArtist: document.getElementById('songArtist'),
+                    playPauseBtn: document.getElementById('playPauseBtn'),
+                    prevBtn: document.getElementById('prevBtn'),
+                    nextBtn: document.getElementById('nextBtn'),
+                    shuffleBtn: document.getElementById('shuffleBtn'),
+                    repeatBtn: document.getElementById('repeatBtn'),
+                    progressBar: document.getElementById('progressBar'),
+                    progressFill: document.getElementById('progressFill'),
+                    progressHandle: document.getElementById('progressHandle'),
+                    currentTime: document.getElementById('currentTime'),
+                    duration: document.getElementById('duration'),
+                    volumeSlider: document.getElementById('volumeSlider'),
+                    volumeFill: document.getElementById('volumeFill'),
+                    volumeHandle: document.getElementById('volumeHandle'),
+                    fileInput: document.getElementById('fileInput'),
+                    fileInputSection: document.getElementById('fileInputSection'),
+                    scanBtn: document.getElementById('scanBtn'),
+                    speakersGrid: document.getElementById('speakersGrid'),
+                    statusIndicator: document.getElementById('statusIndicator'),
+                    connectionStatus: document.getElementById('connectionStatus')
                 };
+
+                this._setupEventListeners();
+                this._setupDragAndDrop();
+                this._initializeSystem();
             }
 
-            async initialize() {
-                this.log('Initializing Web Bluetooth Audio Sync System...');
-                await this.delay(2000);
-                
-                this.isInitialized = true;
-                this.log('✅ System initialized successfully');
-                return true;
-            }
-
-            async start() {
-                if (!this.isInitialized) {
-                    throw new Error('System must be initialized first');
-                }
-                
-                this.log('Starting audio synchronization system...');
-                await this.delay(1000);
-                
-                this.isRunning = true;
-                this.log('✅ System started successfully');
-                return true;
-            }
-
-            async stop() {
-                if (!this.isRunning) return;
-                
-                this.log('Stopping audio synchronization system...');
-                await this.delay(1000);
-                
-                this.isRunning = false;
-                this.log('✅ System stopped successfully');
-                return true;
-            }
-
-            async connectDevices(deviceConfigs) {
-                this.log(`Connecting to ${deviceConfigs.length} device(s)...`);
-                await this.delay(2000);
-                
-                // Simulate device connections
-                const results = [];
-                for (const config of deviceConfigs) {
-                    const deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            async _initializeSystem() {
+                try {
+                    this.log('Initializing SyncPlay Music Player...');
                     
-                    this.devices.set(deviceId, {
-                        id: deviceId,
-                        name: config.name || 'Unknown Device',
-                        connected: true,
-                        quality: ['excellent', 'good', 'fair', 'poor'][Math.floor(Math.random() * 4)],
-                        latency: Math.random() * 50 + 10, // 10-60ms
-                        lastSync: Date.now()
+                    // Initialize the audio sync system
+                    this.audioSyncSystem = new WebBluetoothAudioSync({
+                        syncTolerance: 1,
+                        bufferSize: 2048,
+                        sampleRate: 44100,
+                        enableLogging: true
                     });
+
+                    await this.audioSyncSystem.initialize();
+                    this.isInitialized = true;
                     
-                    results.push({
-                        success: true,
-                        device: { id: deviceId, name: config.name },
-                        deviceState: { connected: true }
-                    });
+                    this._updateConnectionStatus('Ready to connect', false);
+                    this.log('System initialized successfully');
+                    
+                    // Set up system event handlers
+                    this._setupSystemEventHandlers();
+                    
+                } catch (error) {
+                    this.log(`Initialization error: ${error.message}`);
+                    this._updateConnectionStatus('Initialization failed', true);
                 }
-                
-                this.systemStats.connectedDevices = this.devices.size;
-                this.log(`✅ ${results.length} device(s) connected successfully`);
-                return results;
             }
 
-            async disconnectAllDevices() {
-                this.log('Disconnecting all devices...');
-                await this.delay(1000);
-                
-                const count = this.devices.size;
-                this.devices.clear();
-                this.systemStats.connectedDevices = 0;
-                
-                this.log(`✅ ${count} device(s) disconnected`);
-                return true;
+            _setupSystemEventHandlers() {
+                if (!this.audioSyncSystem) return;
+
+                this.audioSyncSystem.on('devicesConnected', (event) => {
+                    this.log(`Connected to ${event.successfulCount} device(s)`);
+                    this._updateConnectionStatus(`${event.successfulCount} speakers connected`, false);
+                    this._updateSystemStatus();
+                });
+
+                this.audioSyncSystem.on('deviceDisconnected', (event) => {
+                    this.log(`Device disconnected: ${event.deviceId}`);
+                    this._removeSpeakerCard(event.deviceId);
+                    this._updateSystemStatus();
+                });
+
+                this.audioSyncSystem.on('playbackStarted', (event) => {
+                    this.log(`Synchronized playback started: ${event.sessionId}`);
+                });
+
+                this.audioSyncSystem.on('playbackStopped', (event) => {
+                    this.log(`Synchronized playback stopped: ${event.sessionId}`);
+                });
             }
 
-            getSystemStatus() {
-                return {
-                    initialized: this.isInitialized,
-                    running: this.isRunning,
-                    activeDevices: this.devices.size,
-                    deviceClocks: Array.from(this.devices.keys()),
-                    systemStats: { ...this.systemStats }
-                };
+            _setupEventListeners() {
+                // File input
+                this.elements.fileInput.addEventListener('change', (e) => {
+                    this._handleFileSelection(e.target.files);
+                });
+
+                // Playback controls
+                this.elements.playPauseBtn.addEventListener('click', () => this._togglePlayPause());
+                this.elements.prevBtn.addEventListener('click', () => this._previousSong());
+                this.elements.nextBtn.addEventListener('click', () => this._nextSong());
+                this.elements.shuffleBtn.addEventListener('click', () => this._toggleShuffle());
+                this.elements.repeatBtn.addEventListener('click', () => this._toggleRepeat());
+
+                // Progress bar
+                this.elements.progressBar.addEventListener('click', (e) => this._seekAudio(e));
+                
+                // Volume slider
+                this.elements.volumeSlider.addEventListener('click', (e) => this._adjustVolume(e));
+
+                // Scan for devices
+                this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
+
+                // Audio element events
+                this.currentAudio.addEventListener('loadedmetadata', () => this._updateDuration());
+                this.currentAudio.addEventListener('timeupdate', () => this._updateProgress());
+                this.currentAudio.addEventListener('ended', () => this._onAudioEnded());
+                this.currentAudio.addEventListener('loadstart', () => this._showLoading(true));
+                this.currentAudio.addEventListener('canplay', () => this._showLoading(false));
             }
 
-            getSynchronizationQuality() {
-                if (this.devices.size === 0) {
-                    return {
-                        overall: 'unknown',
-                        averageAccuracy: 0,
-                        deviceCount: 0,
-                        devices: []
-                    };
+            _setupDragAndDrop() {
+                const fileSection = this.elements.fileInputSection;
+
+                fileSection.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    fileSection.classList.add('dragover');
+                });
+
+                fileSection.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    fileSection.classList.remove('dragover');
+                });
+
+                fileSection.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    fileSection.classList.remove('dragover');
+                    this._handleFileSelection(e.dataTransfer.files);
+                });
+            }
+
+            async _handleFileSelection(files) {
+                if (files.length === 0) return;
+
+                this.log(`Selected ${files.length} file(s)`);
+                
+                // Convert file list to array and filter audio files
+                const audioFiles = Array.from(files).filter(file => 
+                    file.type.startsWith('audio/')
+                );
+
+                if (audioFiles.length === 0) {
+                    this.log('No audio files found in selection');
+                    return;
                 }
 
-                const devices = Array.from(this.devices.values());
-                const totalAccuracy = devices.reduce((sum, device) => {
-                    const accuracyMap = { excellent: 95, good: 85, fair: 70, poor: 50 };
-                    return sum + (accuracyMap[device.quality] || 0);
-                }, 0);
+                // Create playlist
+                this.playlist = audioFiles.map(file => ({
+                    file,
+                    name: file.name,
+                    title: this._extractSongTitle(file.name),
+                    artist: 'Unknown Artist',
+                    url: URL.createObjectURL(file)
+                }));
 
-                return {
-                    overall: this.devices.size > 0 ? 'good' : 'unknown',
-                    averageAccuracy: Math.round(totalAccuracy / devices.length),
-                    deviceCount: devices.length,
-                    devices: devices.map(device => ({
-                        deviceId: device.id,
-                        quality: device.quality,
-                        syncAccuracy: { excellent: 95, good: 85, fair: 70, poor: 50 }[device.quality] || 0,
-                        clockStats: { latency: device.latency }
-                    }))
-                };
+                this.currentSongIndex = 0;
+                await this._loadCurrentSong();
+                this._hideFileInput();
             }
 
-            getSecurityStatus() {
-                return {
-                    secureContext: location.protocol === 'https:' || location.hostname === 'localhost',
-                    webBluetoothSupported: !!navigator.bluetooth,
-                    environment: {
-                        protocol: location.protocol,
-                        hostname: location.hostname
+            _extractSongTitle(filename) {
+                // Remove file extension and clean up the title
+                return filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+            }
+
+            async _loadCurrentSong() {
+                if (this.playlist.length === 0) return;
+
+                const currentSong = this.playlist[this.currentSongIndex];
+                
+                this.log(`Loading: ${currentSong.title}`);
+                
+                // Update UI
+                this.elements.songTitle.textContent = currentSong.title;
+                this.elements.songArtist.textContent = currentSong.artist;
+                
+                // Load audio
+                this.currentAudio.src = currentSong.url;
+                
+                try {
+                    await this.currentAudio.load();
+                    this.log(`Loaded: ${currentSong.title}`);
+                } catch (error) {
+                    this.log(`Error loading audio: ${error.message}`);
+                }
+            }
+
+            async _togglePlayPause() {
+                if (this.playlist.length === 0) {
+                    this.log('No songs loaded');
+                    return;
+                }
+
+                if (!this.audioSyncSystem || !this.audioSyncSystem.isInitialized) {
+                    this.log('Audio system not ready');
+                    return;
+                }
+
+                try {
+                    if (this.isPlaying) {
+                        await this._pausePlayback();
+                    } else {
+                        await this._startPlayback();
                     }
-                };
+                } catch (error) {
+                    this.log(`Playback error: ${error.message}`);
+                }
+            }
+
+            async _startPlayback() {
+                this.log('Starting playback...');
+                
+                try {
+                    // Start the audio sync system if not running
+                    if (!this.audioSyncSystem.isRunning) {
+                        await this.audioSyncSystem.start();
+                    }
+
+                    // Start local audio playback
+                    this.currentAudio.play();
+                    this.isPlaying = true;
+                    
+                    // Update play button
+                    this.elements.playPauseBtn.innerHTML = '⏸️';
+                    
+                    // Start synchronized playback on connected speakers
+                    if (this.connectedSpeakers.size > 0) {
+                        const audioBuffer = await this._createAudioBuffer();
+                        await this.audioSyncSystem.startSynchronizedPlayback(audioBuffer);
+                    }
+                    
+                    this.log('Playback started');
+                    
+                } catch (error) {
+                    this.log(`Failed to start playback: ${error.message}`);
+                    this.isPlaying = false;
+                    this.elements.playPauseBtn.innerHTML = '▶️';
+                }
+            }
+
+            async _pausePlayback() {
+                this.log('Pausing playback...');
+                
+                try {
+                    this.currentAudio.pause();
+                    this.isPlaying = false;
+                    
+                    // Update play button
+                    this.elements.playPauseBtn.innerHTML = '▶️';
+                    
+                    // Stop synchronized playback
+                    if (this.audioSyncSystem.isRunning) {
+                        // Find active session
+                        const status = this.audioSyncSystem.getSystemStatus();
+                        if (status.systemStats.activeSyncSessions > 0) {
+                            // In a real implementation, we'd track session IDs
+                            // For demo purposes, we'll just stop the local audio
+                        }
+                    }
+                    
+                    this.log('Playback paused');
+                    
+                } catch (error) {
+                    this.log(`Failed to pause playback: ${error.message}`);
+                }
+            }
+
+            async _previousSong() {
+                if (this.playlist.length === 0) return;
+                
+                this.currentSongIndex = this.currentSongIndex > 0 
+                    ? this.currentSongIndex - 1 
+                    : this.playlist.length - 1;
+                
+                await this._loadCurrentSong();
+                
+                if (this.isPlaying) {
+                    await this._startPlayback();
+                }
+            }
+
+            async _nextSong() {
+                if (this.playlist.length === 0) return;
+                
+                this.currentSongIndex = this.currentSongIndex < this.playlist.length - 1 
+                    ? this.currentSongIndex + 1 
+                    : 0;
+                
+                await this._loadCurrentSong();
+                
+                if (this.isPlaying) {
+                    await this._startPlayback();
+                }
+            }
+
+            _toggleShuffle() {
+                const btn = this.elements.shuffleBtn;
+                btn.classList.toggle('active');
+                this.log(`Shuffle ${btn.classList.contains('active') ? 'enabled' : 'disabled'}`);
+            }
+
+            _toggleRepeat() {
+                const btn = this.elements.repeatBtn;
+                btn.classList.toggle('active');
+                this.log(`Repeat ${btn.classList.contains('active') ? 'enabled' : 'disabled'}`);
+            }
+
+            _seekAudio(e) {
+                const rect = this.elements.progressBar.getBoundingClientRect();
+                const pos = (e.clientX - rect.left) / rect.width;
+                this.currentAudio.currentTime = pos * this.currentAudio.duration;
+            }
+
+            _adjustVolume(e) {
+                const rect = this.elements.volumeSlider.getBoundingClientRect();
+                const pos = (e.clientX - rect.left) / rect.width;
+                const volume = Math.max(0, Math.min(1, pos));
+                
+                this.currentAudio.volume = volume;
+                this._updateVolumeDisplay(volume);
+            }
+
+            _updateProgress() {
+                if (this.currentAudio.duration) {
+                    const progress = (this.currentAudio.currentTime / this.currentAudio.duration) * 100;
+                    this.elements.progressFill.style.width = `${progress}%`;
+                    this.elements.progressHandle.style.left = `${progress}%`;
+                    this.elements.currentTime.textContent = this._formatTime(this.currentAudio.currentTime);
+                }
+            }
+
+            _updateDuration() {
+                if (this.currentAudio.duration) {
+                    this.elements.duration.textContent = this._formatTime(this.currentAudio.duration);
+                }
+            }
+
+            _updateVolumeDisplay(volume) {
+                const volumePercent = volume * 100;
+                this.elements.volumeFill.style.width = `${volumePercent}%`;
+                this.elements.volumeHandle.style.left = `${volumePercent}%`;
+            }
+
+            _formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            _onAudioEnded() {
+                this.log('Audio ended');
+                
+                const repeatActive = this.elements.repeatBtn.classList.contains('active');
+                
+                if (repeatActive) {
+                    this.currentAudio.currentTime = 0;
+                    this.currentAudio.play();
+                } else {
+                    this._nextSong();
+                }
+            }
+
+            _showLoading(show) {
+                if (show) {
+                    this.elements.playPauseBtn.innerHTML = '<div class="loading-spinner"></div>';
+                } else {
+                    this.elements.playPauseBtn.innerHTML = this.isPlaying ? '⏸️' : '▶️';
+                }
+            }
+
+            async _scanForDevices() {
+                this.log('Scanning for Bluetooth speakers...');
+                
+                try {
+                    // Use the device manager to scan for devices
+                    const availableDevices = await this.audioSyncSystem.deviceManager.scanForDevices();
+                    
+                    this.log(`Found ${availableDevices.length} devices`);
+                    
+                    // Connect to found devices
+                    if (availableDevices.length > 0) {
+                        const deviceConfigs = availableDevices.map(device => ({
+                            name: device.name,
+                            serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb' // A2DP UUID
+                        }));
+                        
+                        const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
+                        this.log(`Connection results:`, results);
+                    }
+                    
+                } catch (error) {
+                    this.log(`Device scan failed: ${error.message}`);
+                    this._updateConnectionStatus('Scan failed', true);
+                }
+            }
+
+            _createAudioBuffer() {
+                // This is a placeholder for creating an AudioBuffer from the current audio
+                // In a real implementation, you'd decode the audio data
+                return new Promise((resolve) => {
+                    // Mock AudioBuffer for demonstration
+                    resolve({
+                        length: this.currentAudio.duration * 44100,
+                        sampleRate: 44100,
+                        duration: this.currentAudio.duration
+                    });
+                });
+            }
+
+            _addSpeakerCard(deviceId, deviceName) {
+                const card = document.createElement('div');
+                card.className = 'speaker-card fade-in';
+                card.id = `speaker-${deviceId}`;
+                
+                card.innerHTML = `
+                    <div class="speaker-header">
+                        <div class="speaker-name">${deviceName}</div>
+                        <div class="speaker-status connected"></div>
+                    </div>
+                    <div class="speaker-controls">
+                        <div class="speaker-toggle">
+                            <div class="toggle-switch active" onclick="speakerCardToggle('${deviceId}')">
+                                <div class="toggle-handle"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                this.elements.speakersGrid.appendChild(card);
+                this.connectedSpeakers.set(deviceId, { name: deviceName, enabled: true });
+            }
+
+            _removeSpeakerCard(deviceId) {
+                const card = document.getElementById(`speaker-${deviceId}`);
+                if (card) {
+                    card.remove();
+                }
+                this.connectedSpeakers.delete(deviceId);
+            }
+
+            _hideFileInput() {
+                this.elements.fileInputSection.classList.add('hidden');
+            }
+
+            _updateSystemStatus() {
+                const status = this.audioSyncSystem.getSystemStatus();
+                const connectedCount = status.activeDevices;
+                
+                if (connectedCount > 0) {
+                    this._updateConnectionStatus(`${connectedCount} speakers connected`, false);
+                    
+                    // Add speaker cards for connected devices
+                    status.deviceClocks.forEach(deviceId => {
+                        if (!this.connectedSpeakers.has(deviceId)) {
+                            this._addSpeakerCard(deviceId, `Speaker ${deviceId.slice(-4)}`);
+                        }
+                    });
+                } else {
+                    this._updateConnectionStatus('Ready to connect', false);
+                }
+            }
+
+            _updateConnectionStatus(message, isError = false) {
+                this.elements.connectionStatus.textContent = message;
+                this.elements.statusIndicator.className = isError ? 'status-indicator disconnected' : 'status-indicator';
             }
 
             log(message) {
                 const timestamp = new Date().toLocaleTimeString();
-                const logEntry = `[${timestamp}] ${message}`;
-                this.logs.push(logEntry);
-                
-                const logArea = document.getElementById('log-area');
-                if (logArea) {
-                    logArea.textContent += logEntry + '\n';
-                    logArea.scrollTop = logArea.scrollHeight;
-                }
-                
-                console.log(logEntry);
-            }
-
-            delay(ms) {
-                return new Promise(resolve => setTimeout(resolve, ms));
+                console.log(`[${timestamp}] SyncPlay: ${message}`);
             }
         }
 
-        // Global system instance
-        let audioSyncSystem = new MockWebBluetoothAudioSync();
-
-        // UI Functions
-        window.initializeSystem = async function() {
-            const initBtn = document.getElementById('init-btn');
-            const startBtn = document.getElementById('start-btn');
-            
-            try {
-                initBtn.innerHTML = '<span class="loading"></span> Initializing...';
-                initBtn.disabled = true;
-                
-                await audioSyncSystem.initialize();
-                
-                initBtn.textContent = 'System Initialized';
-                startBtn.disabled = false;
-                
-                updateSystemStatus();
-                updateMetrics();
-                
-            } catch (error) {
-                showError('Initialization failed: ' + error.message);
-                initBtn.textContent = 'Initialize System';
-                initBtn.disabled = false;
-            }
+        // Global function for speaker card toggles
+        window.speakerCardToggle = function(deviceId) {
+            // This would toggle the speaker in the audio sync system
+            console.log(`Toggle speaker: ${deviceId}`);
         };
 
-        window.startSystem = async function() {
-            const startBtn = document.getElementById('start-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            
-            try {
-                startBtn.innerHTML = '<span class="loading"></span> Starting...';
-                startBtn.disabled = true;
-                
-                await audioSyncSystem.start();
-                
-                startBtn.textContent = 'System Running';
-                stopBtn.disabled = false;
-                
-                updateSystemStatus();
-                updateMetrics();
-                
-            } catch (error) {
-                showError('Failed to start system: ' + error.message);
-                startBtn.textContent = 'Start System';
-                startBtn.disabled = false;
-            }
-        };
-
-        window.stopSystem = async function() {
-            const startBtn = document.getElementById('start-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            
-            try {
-                stopBtn.innerHTML = '<span class="loading"></span> Stopping...';
-                stopBtn.disabled = true;
-                
-                await audioSyncSystem.stop();
-                
-                startBtn.textContent = 'Start System';
-                stopBtn.disabled = true;
-                startBtn.disabled = false;
-                
-                updateSystemStatus();
-                updateMetrics();
-                
-            } catch (error) {
-                showError('Failed to stop system: ' + error.message);
-                stopBtn.textContent = 'Stop System';
-                stopBtn.disabled = false;
-            }
-        };
-
-        window.connectSampleDevices = async function() {
-            if (!audioSyncSystem.isInitialized) {
-                showError('Please initialize the system first');
-                return;
-            }
-
-            try {
-                const deviceConfigs = [
-                    { name: 'Bluetooth Speaker 1', serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb' },
-                    { name: 'Bluetooth Speaker 2', serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb' },
-                    { name: 'Wireless Headphones', serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb' }
-                ];
-                
-                await audioSyncSystem.connectDevices(deviceConfigs);
-                
-                updateDeviceList();
-                updateMetrics();
-                
-            } catch (error) {
-                showError('Failed to connect devices: ' + error.message);
-            }
-        };
-
-        window.disconnectAllDevices = async function() {
-            try {
-                await audioSyncSystem.disconnectAllDevices();
-                updateDeviceList();
-                updateMetrics();
-            } catch (error) {
-                showError('Failed to disconnect devices: ' + error.message);
-            }
-        };
-
-        window.scanForDevices = async function() {
-            showInfo('Scanning for Bluetooth devices... (Demo mode - showing simulated results)');
-            
-            setTimeout(() => {
-                showInfo('Found 3 devices: Bluetooth Speaker 1, Bluetooth Speaker 2, Wireless Headphones');
-                updateDeviceList();
-            }, 2000);
-        };
-
-        window.startTestPlayback = function() {
-            if (!audioSyncSystem.isRunning) {
-                showError('System must be running to start playback');
-                return;
-            }
-            
-            showInfo('Starting synchronized audio playback across all devices...');
-            audioSyncSystem.systemStats.activeSessions++;
-            updateMetrics();
-        };
-
-        window.stopTestPlayback = function() {
-            showInfo('Stopping synchronized audio playback');
-            audioSyncSystem.systemStats.activeSessions = Math.max(0, audioSyncSystem.systemStats.activeSessions - 1);
-            updateMetrics();
-        };
-
-        window.testSynchronization = function() {
-            if (audioSyncSystem.devices.size === 0) {
-                showError('No devices connected to test synchronization');
-                return;
-            }
-            
-            showInfo('Testing synchronization quality...');
-            
-            // Simulate sync test results
-            setTimeout(() => {
-                audioSyncSystem.systemStats.syncAccuracy = Math.floor(Math.random() * 20) + 80; // 80-100%
-                audioSyncSystem.systemStats.averageLatency = Math.floor(Math.random() * 30) + 10; // 10-40ms
-                updateMetrics();
-                showInfo('Synchronization test completed');
-            }, 1500);
-        };
-
-        window.updateStatus = function() {
-            updateSystemStatus();
-            updateMetrics();
-            updateDeviceList();
-        };
-
-        window.showSystemInfo = function() {
-            const infoDiv = document.getElementById('system-info');
-            const contentDiv = document.getElementById('info-content');
-            
-            if (infoDiv.style.display === 'none') {
-                const security = audioSyncSystem.getSecurityStatus();
-                const status = audioSyncSystem.getSystemStatus();
-                
-                contentDiv.innerHTML = `
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px;">
-                        <h4>Security Status</h4>
-                        <p><strong>Secure Context:</strong> ${security.secureContext ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Web Bluetooth Support:</strong> ${security.webBluetoothSupported ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Protocol:</strong> ${security.environment.protocol}</p>
-                        <p><strong>Hostname:</strong> ${security.environment.hostname}</p>
-                        
-                        <h4>System Status</h4>
-                        <p><strong>Initialized:</strong> ${status.initialized ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Running:</strong> ${status.running ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Active Devices:</strong> ${status.activeDevices}</p>
-                        <p><strong>Connected Devices:</strong> ${status.systemStats.connectedDevices}</p>
-                    </div>
-                `;
-                
-                infoDiv.style.display = 'block';
-            } else {
-                infoDiv.style.display = 'none';
-            }
-        };
-
-        window.exportLogs = function() {
-            const logs = audioSyncSystem.logs.join('\n');
-            const blob = new Blob([logs], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `bluetooth-audio-sync-logs-${new Date().toISOString().split('T')[0]}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        };
-
-        window.clearLogs = function() {
-            document.getElementById('log-area').textContent = '';
-            audioSyncSystem.logs = [];
-        };
-
-        // UI Update Functions
-        function updateSystemStatus() {
-            const statusDiv = document.getElementById('system-status');
-            const status = audioSyncSystem.getSystemStatus();
-            
-            let statusHtml = '';
-            
-            if (status.initialized && status.running) {
-                statusHtml = '<div class="success">✅ System is running and ready</div>';
-            } else if (status.initialized) {
-                statusHtml = '<div class="warning">⚠️ System initialized but not running</div>';
-            } else {
-                statusHtml = '<div class="error-message">❌ System not initialized</div>';
-            }
-            
-            statusDiv.innerHTML = statusHtml;
-        }
-
-        function updateMetrics() {
-            const quality = audioSyncSystem.getSynchronizationQuality();
-            
-            document.getElementById('connected-devices').textContent = quality.deviceCount;
-            document.getElementById('sync-accuracy').textContent = quality.averageAccuracy + '%';
-            document.getElementById('average-latency').textContent = Math.round(quality.devices.reduce((sum, d) => sum + d.clockStats.latency, 0) / (quality.devices.length || 1)) + 'ms';
-            document.getElementById('active-sessions').textContent = audioSyncSystem.systemStats.activeSessions;
-            
-            document.getElementById('metrics-grid').style.display = 'grid';
-        }
-
-        function updateDeviceList() {
-            const deviceListDiv = document.getElementById('device-list');
-            const devices = Array.from(audioSyncSystem.devices.values());
-            
-            if (devices.length === 0) {
-                deviceListDiv.innerHTML = '<div class="info-message">No devices connected</div>';
-                return;
-            }
-            
-            let html = '';
-            devices.forEach(device => {
-                const qualityClass = `quality-${device.quality}`;
-                html += `
-                    <div class="device-item">
-                        <strong>${device.name}</strong> (${device.id})
-                        <br>
-                        <span class="quality-indicator ${qualityClass}">${device.quality.toUpperCase()}</span>
-                        <span style="margin-left: 10px;">Latency: ${Math.round(device.latency)}ms</span>
-                        <span style="margin-left: 10px;">Last Sync: ${new Date(device.lastSync).toLocaleTimeString()}</span>
-                    </div>
-                `;
-            });
-            
-            deviceListDiv.innerHTML = html;
-            
-            // Update button states
-            document.querySelector('button[onclick="disconnectAllDevices()"]').disabled = devices.length === 0;
-            document.querySelector('button[onclick="startTestPlayback()"]').disabled = devices.length === 0 || !audioSyncSystem.isRunning;
-            document.querySelector('button[onclick="stopTestPlayback()"]').disabled = !audioSyncSystem.isRunning;
-        }
-
-        function showError(message) {
-            const logArea = document.getElementById('log-area');
-            logArea.textContent += `[ERROR] ${message}\n`;
-            logArea.scrollTop = logArea.scrollHeight;
-            console.error(message);
-        }
-
-        function showInfo(message) {
-            const logArea = document.getElementById('log-area');
-            logArea.textContent += `[INFO] ${message}\n`;
-            logArea.scrollTop = logArea.scrollHeight;
-            console.info(message);
-        }
-
-        // Initialize UI
-        document.addEventListener('DOMContentLoaded', function() {
-            audioSyncSystem.log('🎵 Web Bluetooth Audio Synchronization Demo Loaded');
-            audioSyncSystem.log('ℹ️ This is a demonstration interface with simulated functionality');
-            audioSyncSystem.log('ℹ️ In a real implementation, this would connect to actual Bluetooth devices');
-            updateSystemStatus();
+        // Initialize the music player
+        document.addEventListener('DOMContentLoaded', () => {
+            new SyncPlayMusicPlayer();
         });
     </script>
 </body>

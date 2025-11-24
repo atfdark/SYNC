@@ -1,45 +1,34 @@
 {
-  "version": 2,
-  "name": "web-bluetooth-audio-sync",
-  "builds": [
+  "buildCommand": "echo 'Static site - no build required'",
+  "outputDirectory": ".",
+  "rewrites": [
     {
-      "src": "index.html",
-      "use": "@vercel/static",
-      "config": {
-        "distDir": "."
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/index.html",
-      "dest": "/index.html"
+      "source": "/index.html",
+      "destination": "/index.html"
     },
     {
-      "src": "/",
-      "dest": "/index.html"
+      "source": "/",
+      "destination": "/index.html"
     },
     {
-      "src": "/src/(.*)",
-      "dest": "/src/$1",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
+      "source": "/src/(.*)",
+      "destination": "/src/$1"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
+      "source": "/assets/(.*)",
+      "destination": "/assets/$1"
     },
     {
-      "src": "/tests/(.*)",
-      "dest": "/tests/$1"
+      "source": "/tests/(.*)",
+      "destination": "/tests/$1"
     },
     {
-      "src": "/docs/(.*)",
-      "dest": "/docs/$1"
+      "source": "/docs/(.*)",
+      "destination": "/docs/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -65,6 +54,24 @@
         {
           "key": "Permissions-Policy",
           "value": "bluetooth=(self)"
+        }
+      ]
+    },
+    {
+      "source": "/src/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

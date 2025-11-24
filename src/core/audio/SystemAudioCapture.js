@@ -36,29 +36,50 @@ class SystemAudioCapture extends EventEmitter {
         };
         
         this.log = logger.createScopedLogger('SystemAudioCapture');
-        
-        this._initializeAudioContext();
+
+        // Initialize audio context asynchronously
+        this._initializeAudioContext().catch(error => {
+            this.log.error('Failed to initialize System AudioContext in constructor', { error: error.message });
+        });
     }
 
     /**
      * Initialize audio context and check for support
      * @private
      */
-    _initializeAudioContext() {
+    async _initializeAudioContext() {
         try {
+            this.log.debug('Attempting to initialize System AudioContext', {
+                hasAudioContext: !!window.AudioContext,
+                hasWebkitAudioContext: !!window.webkitAudioContext,
+                userAgent: navigator.userAgent
+            });
             // Check for getDisplayMedia support (for system audio capture)
-            this.isSupported = navigator.mediaDevices && 
+            this.isSupported = navigator.mediaDevices &&
                               navigator.mediaDevices.getDisplayMedia &&
                               window.AudioContext;
-            
+
             if (this.isSupported) {
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+                if (!AudioContextClass) {
+                    throw new Error('AudioContext not available in this browser');
+                }
+
+                this.audioContext = new AudioContextClass({
                     sampleRate: this.sampleRate
                 });
-                
+
+                // Resume AudioContext if it's suspended (required in modern browsers)
+                if (this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+
                 this.log.info('System audio capture initialized', {
                     sampleRate: this.sampleRate,
-                    supported: true
+                    supported: true,
+                    audioContextState: this.audioContext.state,
+                    actualSampleRate: this.audioContext.sampleRate
                 });
             } else {
                 this.log.warn('System audio capture not supported', {
@@ -66,9 +87,13 @@ class SystemAudioCapture extends EventEmitter {
                     audioContext: !!(window.AudioContext || window.webkitAudioContext)
                 });
             }
-            
+
         } catch (error) {
-            this.log.error('Failed to initialize audio context', { error: error.message });
+            this.log.error('Failed to initialize audio context', {
+                error: error.message,
+                errorName: error.name,
+                stack: error.stack
+            });
             this.isSupported = false;
         }
     }

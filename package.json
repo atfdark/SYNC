@@ -30,6 +30,9 @@
     "lint": "echo 'No linting configured for static site'",
     "format": "echo 'Code formatting handled by IDE'"
   },
+  "dependencies": {
+    "qrcode": "^1.5.3"
+  },
   "devDependencies": {
     "vercel": "^32.0.0"
   },

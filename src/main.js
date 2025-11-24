@@ -791,13 +791,43 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _createAudioStreamFromSystemCapture() {
         // This is a simplified implementation
         // In a real scenario, you'd create a MediaStream from the captured audio
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const destination = audioContext.createMediaStreamDestination();
-        
-        // Connect the audio context to create a stream
-        // This would need to be connected to the actual captured audio
-        
-        return destination.stream;
+        try {
+            this.log.debug('Creating audio stream from system capture', {
+                hasAudioContext: !!window.AudioContext,
+                hasWebkitAudioContext: !!window.webkitAudioContext
+            });
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+            if (!AudioContextClass) {
+                throw new Error('AudioContext not available for stream creation');
+            }
+
+            const audioContext = new AudioContextClass();
+            const destination = audioContext.createMediaStreamDestination();
+
+            // Resume AudioContext if it's suspended (required in modern browsers)
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            this.log.info('Audio stream created successfully', {
+                audioContextState: audioContext.state,
+                sampleRate: audioContext.sampleRate
+            });
+
+            // Connect the audio context to create a stream
+            // This would need to be connected to the actual captured audio
+
+            return destination.stream;
+        } catch (error) {
+            this.log.error('Failed to create audio stream', {
+                error: error.message,
+                errorName: error.name,
+                stack: error.stack
+            });
+            throw error;
+        }
     }
 
     /**

@@ -46,24 +46,54 @@ class WebRTCAudioManager extends EventEmitter {
         };
         
         this.log = logger.createScopedLogger('WebRTCAudioManager');
-        
-        this._initializeAudioContext();
+
+        // Initialize audio context asynchronously
+        this._initializeAudioContext().catch(error => {
+            this.log.error('Failed to initialize WebRTC AudioContext in constructor', { error: error.message });
+        });
     }
 
     /**
      * Initialize Web Audio context for streaming
      * @private
      */
-    _initializeAudioContext() {
+    async _initializeAudioContext() {
         try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            this.log.debug('Attempting to initialize WebRTC AudioContext', {
+                hasAudioContext: !!window.AudioContext,
+                hasWebkitAudioContext: !!window.webkitAudioContext,
+                userAgent: navigator.userAgent
+            });
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+            if (!AudioContextClass) {
+                throw new Error('AudioContext not available in this browser');
+            }
+
+            this.audioContext = new AudioContextClass({
                 sampleRate: 44100
             });
-            
-            this.log.info('WebRTC Audio context initialized');
-            
+
+            // Resume AudioContext if it's suspended (required in modern browsers)
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+
+            this.log.info('WebRTC Audio context initialized successfully', {
+                state: this.audioContext.state,
+                sampleRate: this.audioContext.sampleRate
+            });
+
         } catch (error) {
-            this.log.error('Failed to initialize audio context', { error: error.message });
+            this.log.error('Failed to initialize audio context', {
+                error: error.message,
+                errorName: error.name,
+                stack: error.stack,
+                hasAudioContext: !!window.AudioContext,
+                hasWebkitAudioContext: !!window.webkitAudioContext
+            });
+            throw error;
         }
     }
 

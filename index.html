@@ -6,6 +6,7 @@
     <meta name="description" "SyncPlay - Multi-Speaker Bluetooth Audio Synchronization">
     <title>SyncPlay - Multi-Speaker Music Player</title>
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2IDJMMTMuNSA1LjVMMTEgNkw5IDlMMTEgMTIuNUwxMy41IDE1TDE2IDEyTDExIDEyTDExIDhMMjIgMTNMMjIgMTBMMTYgMloiIGZpbGw9IiMwMDdiZmYiLz4KPC9zdmc+">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -1658,11 +1659,39 @@
                 // Generate connection URL
                 const baseURL = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
                 const mobileURL = baseURL + 'mobile-speaker.html';
-                
+
                 this.elements.connectionURL.textContent = mobileURL;
                 this.elements.connectionQR.style.display = 'block';
-                
+
+                // Generate QR code
+                this._generateConnectionQR(mobileURL);
+
                 this.log(`Mobile connection URL: ${mobileURL}`);
+            }
+
+            _generateConnectionQR(url) {
+                const qrContainer = this.elements.connectionQR.querySelector('.qr-placeholder');
+
+                // Clear existing QR code
+                qrContainer.innerHTML = '';
+
+                // Generate QR code
+                QRCode.toCanvas(url, {
+                    width: 120,
+                    height: 120,
+                    color: {
+                        dark: '#1a1a2e',
+                        light: '#ffffff'
+                    }
+                }, (error, canvas) => {
+                    if (error) {
+                        console.error('QR code generation failed:', error);
+                        qrContainer.innerHTML = '❌';
+                        return;
+                    }
+
+                    qrContainer.appendChild(canvas);
+                });
             }
 
             _updateMobileOutputUI(enabled) {

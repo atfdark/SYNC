@@ -206,31 +206,59 @@ class WebRTCAudioManager extends EventEmitter {
     async acceptConnectionAnswer(peerId, answer) {
         try {
             const peerConnection = this.connections.get(peerId);
-            
+
             if (!peerConnection) {
                 throw new Error(`No pending connection found for peer ${peerId}`);
             }
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-            
+
             this.pendingConnections.delete(peerId);
             this.connectedPeers.add(peerId);
-            
+
             // Update statistics
             const connectionTime = Date.now() - (this.connectionStats.lastConnectionStart || Date.now());
             this.connectionStats.successfulConnections++;
-            this.connectionStats.averageConnectionTime = 
+            this.connectionStats.averageConnectionTime =
                 (this.connectionStats.averageConnectionTime + connectionTime) / 2;
-            
+
             this.log.info('Connection established', { peerId });
             this.emit('connectionEstablished', { peerId });
 
         } catch (error) {
-            this.log.error('Failed to accept connection answer', { 
-                peerId, 
-                error: error.message 
+            this.log.error('Failed to accept connection answer', {
+                peerId,
+                error: error.message
             });
             this._cleanupFailedConnection(peerId);
+            throw error;
+        }
+    }
+
+    /**
+     * Add ICE candidate from remote peer
+     * @param {string} peerId - Peer identifier
+     * @param {object} candidate - ICE candidate data
+     * @returns {Promise<void>}
+     */
+    async addIceCandidate(peerId, candidate) {
+        try {
+            const peerConnection = this.connections.get(peerId);
+
+            if (!peerConnection) {
+                throw new Error(`No connection found for peer ${peerId}`);
+            }
+
+            if (candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                this.log.debug('ICE candidate added', { peerId });
+            }
+
+        } catch (error) {
+            this.log.error('Failed to add ICE candidate', {
+                peerId,
+                error: error.message
+            });
             throw error;
         }
     }

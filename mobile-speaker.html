@@ -343,6 +343,9 @@
                     case 'webrtc-offer':
                         this._handleConnectionOffer(data);
                         break;
+                    case 'webrtc-offer-candidate':
+                        this._handleOfferIceCandidate(data);
+                        break;
                     case 'webrtc-answer-accepted':
                         this._updateConnectionStatus('Connection established!', false);
                         break;
@@ -390,7 +393,7 @@
                     this.peerConnection.onicecandidate = (event) => {
                         if (event.candidate) {
                             this._sendBroadcastMessage({
-                                type: 'webrtc-answer',
+                                type: 'webrtc-answer-candidate',
                                 candidate: event.candidate,
                                 peerId: this.deviceId
                             });
@@ -624,6 +627,20 @@
                 };
                 
                 updateLevel();
+            }
+
+            _handleOfferIceCandidate(data) {
+                const { peerId, candidate } = data;
+                this.log.debug(`Received ICE candidate from offerer: ${peerId}`);
+
+                try {
+                    if (this.peerConnection && candidate) {
+                        this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                        this.log.debug('ICE candidate added to peer connection');
+                    }
+                } catch (error) {
+                    this.log.error('Failed to add ICE candidate', { error: error.message });
+                }
             }
 
             _sendBroadcastMessage(message) {

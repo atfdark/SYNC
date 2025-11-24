@@ -1101,6 +1101,10 @@
                 this.audioSyncSystem.on('mobileAudioStreamingStopped', () => {
                     this.log('Stopped streaming audio to mobile devices');
                 });
+
+                this.audioSyncSystem.on('iceCandidate', (event) => {
+                    this._sendIceCandidateToMobile(event.peerId, event.candidate);
+                });
             }
 
             _setupEventListeners() {
@@ -1663,9 +1667,9 @@
                     this.mobileBroadcastChannel.onmessage = (event) => {
                         this._handleMobileBroadcastMessage(event.data);
                     };
-                    this.log.log('Mobile broadcast channel set up');
+                    this.log('Mobile broadcast channel set up');
                 } else {
-                    this.log.error('BroadcastChannel not supported');
+                    this.log('BroadcastChannel not supported');
                 }
             }
 
@@ -1673,12 +1677,12 @@
                 if (this.mobileBroadcastChannel) {
                     this.mobileBroadcastChannel.close();
                     this.mobileBroadcastChannel = null;
-                    this.log.log('Mobile broadcast channel cleaned up');
+                    this.log('Mobile broadcast channel cleaned up');
                 }
             }
 
             async _handleMobileBroadcastMessage(data) {
-                this.log.log('Received mobile broadcast message', data);
+                this.log('Received mobile broadcast message', data);
 
                 try {
                     switch (data.type) {
@@ -1692,10 +1696,10 @@
                             await this._handleWebRTCAnswerCandidate(data);
                             break;
                         default:
-                            this.log.debug('Unknown mobile broadcast message type', data.type);
+                            this.log('Unknown mobile broadcast message type', data.type);
                     }
                 } catch (error) {
-                    this.log.error('Error handling mobile broadcast message', { error: error.message, data });
+                    this.log('Error handling mobile broadcast message', { error: error.message, data });
                 }
             }
 
@@ -1704,7 +1708,7 @@
 
                 try {
                     // Create connection offer for the mobile device
-                    const offerData = await this.audioSyncSystem.createConnectionOffer(peerId);
+                    const offerData = await this.audioSyncSystem.createMobileConnectionOffer(peerId);
 
                     // Send offer via broadcast channel
                     if (this.mobileBroadcastChannel) {
@@ -1725,7 +1729,7 @@
                 this.log.log(`Received WebRTC answer from ${peerId}`);
 
                 try {
-                    await this.audioSyncSystem.acceptConnectionAnswer(peerId, answer);
+                    await this.audioSyncSystem.acceptMobileConnectionAnswer(peerId, answer);
                     this.log.log(`WebRTC connection established with ${peerId}`);
 
                     // Notify mobile device that connection is accepted
@@ -1744,9 +1748,11 @@
                 const { peerId, candidate } = data;
                 this.log.debug(`Received ICE candidate from ${peerId}`);
 
-                // Add ICE candidate to the peer connection
-                // This would need to be implemented in the WebRTCAudioManager
-                // For now, we'll just log it
+                try {
+                    await this.audioSyncSystem.addMobileIceCandidate(peerId, candidate);
+                } catch (error) {
+                    this.log.error(`Failed to add ICE candidate from ${peerId}`, { error: error.message });
+                }
             }
 
             _showMobileConnectionInfo() {
@@ -1814,7 +1820,7 @@
                 if (deviceCard) {
                     deviceCard.remove();
                 }
-                
+
                 // Show "no devices" message if no devices connected
                 if (this.elements.mobileDeviceList.children.length === 0) {
                     this.elements.mobileDeviceList.innerHTML = `
@@ -1822,6 +1828,19 @@
                             No mobile devices connected. Enable mobile output mode to connect tablets/phones.
                         </div>
                     `;
+                }
+            }
+
+            _sendIceCandidateToMobile(peerId, candidate) {
+                if (this.mobileBroadcastChannel) {
+                    this.mobileBroadcastChannel.postMessage({
+                        type: 'webrtc-offer-candidate',
+                        peerId: peerId,
+                        candidate: candidate
+                    });
+                    this.log.debug(`Sent ICE candidate to mobile device: ${peerId}`);
+                } else {
+                    this.log.error('Mobile broadcast channel not available for sending ICE candidate');
                 }
             }
 

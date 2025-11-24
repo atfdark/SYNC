@@ -709,17 +709,38 @@ class WebBluetoothAudioSync extends EventEmitter {
     async acceptMobileConnectionAnswer(peerId, answer) {
         try {
             await this.webrtcManager.acceptConnectionAnswer(peerId, answer);
-            
+
             this.mobilePeers.add(peerId);
-            
+
             this.emit('mobilePeerConnected', { peerId });
-            
+
             this.log.info('Mobile peer connected', { peerId });
-            
+
         } catch (error) {
-            this.log.error('Failed to accept mobile connection answer', { 
-                peerId, 
-                error: error.message 
+            this.log.error('Failed to accept mobile connection answer', {
+                peerId,
+                error: error.message
+            });
+            throw error;
+        }
+    }
+
+    /**
+     * Add ICE candidate from mobile peer
+     * @param {string} peerId - Mobile device identifier
+     * @param {object} candidate - ICE candidate data
+     * @returns {Promise<void>}
+     */
+    async addMobileIceCandidate(peerId, candidate) {
+        try {
+            await this.webrtcManager.addIceCandidate(peerId, candidate);
+
+            this.log.debug('Mobile ICE candidate added', { peerId });
+
+        } catch (error) {
+            this.log.error('Failed to add mobile ICE candidate', {
+                peerId,
+                error: error.message
             });
             throw error;
         }
@@ -1008,6 +1029,19 @@ class WebBluetoothAudioSync extends EventEmitter {
         // System Audio Capture events
         this.systemAudioCapture.on('audioFrame', (event) => {
             // Audio frames are processed in _processSystemAudioFrame
+        });
+
+        // WebRTC Manager events
+        this.webrtcManager.on('iceCandidate', (event) => {
+            this.emit('iceCandidate', event);
+        });
+
+        this.webrtcManager.on('peerConnected', (event) => {
+            this.emit('mobilePeerConnected', event);
+        });
+
+        this.webrtcManager.on('peerDisconnected', (event) => {
+            this.emit('mobilePeerDisconnected', event);
         });
     }
 

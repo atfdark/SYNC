@@ -91,12 +91,12 @@ class DeviceManager extends EventEmitter {
      */
     async connectDevice(deviceConfig, options = {}) {
         const connectionId = this._generateConnectionId();
-        
-        this.log.info('Connecting to device', { 
-            connectionId, 
-            deviceConfig: this._sanitizeConfig(deviceConfig) 
+
+        this.log.info('Connecting to device', {
+            connectionId,
+            deviceConfig: this._sanitizeConfig(deviceConfig)
         });
-        
+
         this.emit('connectionStarted', { connectionId, deviceConfig });
         
         try {
@@ -314,7 +314,7 @@ class DeviceManager extends EventEmitter {
      */
     async scanForDevices(scanOptions = {}) {
         this.log.info('Scanning for Bluetooth devices', scanOptions);
-        
+
         // Note: Web Bluetooth doesn't support device scanning like classic Bluetooth
         // This is a simulation for demo purposes
         const simulatedDevices = [
@@ -343,9 +343,9 @@ class DeviceManager extends EventEmitter {
                 isSimulated: true
             }
         ];
-        
+
         this.emit('deviceScanCompleted', { devices: simulatedDevices });
-        
+
         return simulatedDevices;
     }
 

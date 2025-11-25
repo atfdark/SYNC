@@ -1143,7 +1143,7 @@
                 this.elements.volumeSlider.addEventListener('click', (e) => this._adjustVolume(e));
 
                 // Scan for devices
-                this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
+                 this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
 
                 // System Audio controls
                 this.elements.dualOutputToggle.addEventListener('click', () => this._toggleDualOutput());
@@ -1422,16 +1422,17 @@
 
             async _scanForDevices() {
                 this.log('Scanning for Bluetooth speakers...');
-                
+
                 try {
                     // Use the device manager to scan for devices
                     const availableDevices = await this.audioSyncSystem.deviceManager.scanForDevices();
-                    
+
                     this.log(`Found ${availableDevices.length} devices`);
-                    
+
                     // Connect to found devices
                     if (availableDevices.length > 0) {
                         const deviceConfigs = availableDevices.map(device => ({
+                            id: device.id,
                             name: device.name,
                             serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb', // A2DP UUID
                             isSimulated: device.isSimulated || false
@@ -1440,7 +1441,7 @@
                         const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
                         this.log(`Connection results:`, results);
                     }
-                    
+
                 } catch (error) {
                     this.log(`Device scan failed: ${error.message}`);
                     this._updateConnectionStatus('Scan failed', true);

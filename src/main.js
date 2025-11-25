@@ -1113,24 +1113,83 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleMobileBroadcastMessage(data) {
         this.log.info('Received mobile broadcast message', { type: data.type, peerId: data.peerId });
 
+        // Detailed logging for debugging
+        this.log.debug('Processing mobile broadcast message', {
+            data: JSON.stringify(data),
+            dataType: typeof data,
+            hasType: !!data?.type,
+            hasPeerId: !!data?.peerId
+        });
+
         try {
+            // Validate message format
+            if (!data || typeof data !== 'object') {
+                throw new Error('Invalid message format: data is not an object');
+            }
+
+            if (!data.type || typeof data.type !== 'string') {
+                throw new Error('Invalid message format: missing or invalid type field');
+            }
+
             switch (data.type) {
                 case 'mobile-ready':
-                    await this._handleMobileReady(data);
+                    try {
+                        this.log.debug('Handling mobile-ready message', { peerId: data.peerId });
+                        await this._handleMobileReady(data);
+                        this.log.debug('Successfully handled mobile-ready message', { peerId: data.peerId });
+                    } catch (error) {
+                        this.log.error('Error in handling mobile-ready message', {
+                            peerId: data.peerId,
+                            error: error.message,
+                            stack: error.stack,
+                            incomingMessageData: JSON.stringify(data)
+                        });
+                        throw error;
+                    }
                     break;
                 case 'webrtc-answer':
-                    await this._handleWebRTCAnswer(data);
+                    try {
+                        this.log.debug('Handling webrtc-answer message', { peerId: data.peerId, answerType: data.answer?.type });
+                        await this._handleWebRTCAnswer(data);
+                        this.log.debug('Successfully handled webrtc-answer message', { peerId: data.peerId });
+                    } catch (error) {
+                        this.log.error('Error in handling webrtc-answer message', {
+                            peerId: data.peerId,
+                            error: error.message,
+                            stack: error.stack,
+                            incomingMessageData: JSON.stringify(data)
+                        });
+                        throw error;
+                    }
                     break;
                 case 'webrtc-answer-candidate':
-                    await this._handleWebRTCAnswerCandidate(data);
+                    try {
+                        this.log.debug('Handling webrtc-answer-candidate message', { peerId: data.peerId, candidateType: data.candidate?.type });
+                        await this._handleWebRTCAnswerCandidate(data);
+                        this.log.debug('Successfully handled webrtc-answer-candidate message', { peerId: data.peerId });
+                    } catch (error) {
+                        this.log.error('Error in handling webrtc-answer-candidate message', {
+                            peerId: data.peerId,
+                            error: error.message,
+                            stack: error.stack,
+                            incomingMessageData: JSON.stringify(data)
+                        });
+                        throw error;
+                    }
                     break;
                 default:
-                    this.log.debug('Unknown mobile broadcast message type', data.type);
+                    this.log.warn('Unknown mobile broadcast message type', {
+                        type: data.type,
+                        fullData: JSON.stringify(data)
+                    });
             }
         } catch (error) {
             this.log.error('Failed to handle mobile broadcast message', {
-                type: data.type,
-                error: error.message
+                type: data?.type || 'unknown',
+                peerId: data?.peerId || 'unknown',
+                error: error.message,
+                stack: error.stack,
+                incomingMessageData: JSON.stringify(data)
             });
         }
     }
@@ -1143,21 +1202,20 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleMobileReady(data) {
         const { peerId } = data;
 
-        console.log('[DEBUG] Mobile ready message received:', { peerId, mobileOutputMode: this.mobileOutputMode, data });
+        this.log.debug('Mobile ready message received', { peerId, mobileOutputMode: this.mobileOutputMode, data });
 
         if (!this.mobileOutputMode) {
             this.log.warn('Mobile ready received but mobile output mode not enabled', { peerId });
-            console.warn('[DEBUG] Mobile output mode not enabled, ignoring mobile-ready message');
             return;
         }
 
         this.log.info('Mobile device ready, creating connection offer', { peerId });
-        console.log('[DEBUG] Creating WebRTC connection offer for peer:', peerId);
 
         try {
             // Create WebRTC offer for the mobile peer
+            this.log.debug('Calling createMobileConnectionOffer', { peerId });
             const offerData = await this.createMobileConnectionOffer(peerId);
-            console.log('[DEBUG] WebRTC offer created successfully:', { peerId, offerType: offerData.offer.type });
+            this.log.debug('WebRTC offer created successfully', { peerId, offerType: offerData.offer.type });
 
             // Send offer via BroadcastChannel
             this._sendMobileBroadcastMessage({
@@ -1167,14 +1225,13 @@ class WebBluetoothAudioSync extends EventEmitter {
             });
 
             this.log.info('WebRTC offer sent to mobile peer', { peerId });
-            console.log('[DEBUG] WebRTC offer sent via BroadcastChannel to peer:', peerId);
 
         } catch (error) {
             this.log.error('Failed to create and send offer to mobile peer', {
                 peerId,
-                error: error.message
+                error: error.message,
+                stack: error.stack
             });
-            console.error('[DEBUG] Failed to create/send WebRTC offer:', { peerId, error: error.message, stack: error.stack });
         }
     }
 
@@ -1186,26 +1243,27 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleWebRTCAnswer(data) {
         const { peerId, answer } = data;
 
-        console.log('[DEBUG] WebRTC answer received from mobile peer:', { peerId, answerType: answer?.type });
+        this.log.debug('WebRTC answer received from mobile peer', { peerId, answerType: answer?.type });
         this.log.info('Received WebRTC answer from mobile peer', { peerId });
 
         try {
+            this.log.debug('Calling acceptMobileConnectionAnswer', { peerId });
             await this.acceptMobileConnectionAnswer(peerId, answer);
-            console.log('[DEBUG] WebRTC answer accepted successfully for peer:', peerId);
+            this.log.debug('WebRTC answer accepted successfully', { peerId });
 
             // Notify mobile that answer was accepted
             this._sendMobileBroadcastMessage({
                 type: 'webrtc-answer-accepted',
                 peerId
             });
-            console.log('[DEBUG] Sent webrtc-answer-accepted message to peer:', peerId);
+            this.log.debug('Sent webrtc-answer-accepted message to peer', { peerId });
 
         } catch (error) {
             this.log.error('Failed to accept WebRTC answer', {
                 peerId,
-                error: error.message
+                error: error.message,
+                stack: error.stack
             });
-            console.error('[DEBUG] Failed to accept WebRTC answer:', { peerId, error: error.message, stack: error.stack });
         }
     }
 
@@ -1217,18 +1275,19 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleWebRTCAnswerCandidate(data) {
         const { peerId, candidate } = data;
 
-        console.log('[DEBUG] ICE candidate received from mobile peer:', { peerId, candidateType: candidate?.type, candidate: candidate?.candidate?.substring(0, 50) + '...' });
+        this.log.debug('ICE candidate received from mobile peer', { peerId, candidateType: candidate?.type, candidateSnippet: candidate?.candidate?.substring(0, 50) + '...' });
         this.log.debug('Received ICE candidate from mobile peer', { peerId });
 
         try {
+            this.log.debug('Calling addMobileIceCandidate', { peerId });
             await this.addMobileIceCandidate(peerId, candidate);
-            console.log('[DEBUG] ICE candidate added successfully for peer:', peerId);
+            this.log.debug('ICE candidate added successfully', { peerId });
         } catch (error) {
             this.log.error('Failed to add ICE candidate from mobile peer', {
                 peerId,
-                error: error.message
+                error: error.message,
+                stack: error.stack
             });
-            console.error('[DEBUG] Failed to add ICE candidate:', { peerId, error: error.message });
         }
     }
 

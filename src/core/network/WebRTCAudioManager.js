@@ -133,8 +133,11 @@ class WebRTCAudioManager extends EventEmitter {
             this.log.info('Creating connection offer', { peerId });
 
             // Create peer connection
-            const peerConnection = new RTCPeerConnection({ 
-                iceServers: this.iceServers 
+            const peerConnection = new RTCPeerConnection({
+                iceServers: this.iceServers,
+                iceCandidatePoolSize: 10,
+                bundlePolicy: 'max-bundle',
+                rtcpMuxPolicy: 'require'
             });
             
             this.connections.set(peerId, peerConnection);
@@ -173,13 +176,31 @@ class WebRTCAudioManager extends EventEmitter {
                 this.log.error('Data channel error', { peerId, error: error.message });
             };
 
+            // Set up ICE gathering timeout
+            let iceGatheringResolve;
+            const iceGatheringPromise = new Promise(resolve => {
+                iceGatheringResolve = resolve;
+            });
+            peerConnection.onicegatheringstatechange = () => {
+                if (peerConnection.iceGatheringState === 'complete') {
+                    iceGatheringResolve();
+                }
+            };
+
             // Create offer
             const offer = await peerConnection.createOffer({
                 offerToReceiveAudio: true,
-                offerToReceiveVideo: false
+                offerToReceiveVideo: false,
+                voiceActivityDetection: false
             });
 
             await peerConnection.setLocalDescription(offer);
+
+            // Wait for ICE gathering to complete or timeout
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('ICE gathering timeout after 10 seconds')), 10000);
+            });
+            await Promise.race([iceGatheringPromise, timeoutPromise]);
 
             // Update statistics
             this.connectionStats.totalConnections++;

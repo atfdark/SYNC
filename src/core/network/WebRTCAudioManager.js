@@ -130,22 +130,25 @@ class WebRTCAudioManager extends EventEmitter {
         }
 
         try {
+            console.log('[DEBUG] Creating WebRTC connection offer for peer:', peerId);
             this.log.info('Creating connection offer', { peerId, supported: this.isSupported() });
 
             // Create peer connection
+            console.log('[DEBUG] Creating RTCPeerConnection');
             const peerConnection = new RTCPeerConnection({
                 iceServers: this.iceServers,
                 iceCandidatePoolSize: 10,
                 bundlePolicy: 'max-bundle',
                 rtcpMuxPolicy: 'require'
             });
-            
+
             this.connections.set(peerId, peerConnection);
             this.pendingConnections.add(peerId);
 
             // Set up connection event handlers
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
+                    console.log('[DEBUG] Generated ICE candidate for offer:', { peerId, type: event.candidate.type });
                     this.emit('iceCandidate', { peerId, candidate: event.candidate });
                 }
             };
@@ -155,15 +158,18 @@ class WebRTCAudioManager extends EventEmitter {
             };
 
             peerConnection.ontrack = (event) => {
+                console.log('[DEBUG] Received remote track in offerer');
                 this._handleRemoteStream(peerId, event.streams[0]);
             };
 
             // Create data channel for control messages
+            console.log('[DEBUG] Creating data channel');
             const dataChannel = peerConnection.createDataChannel('audioControl', {
                 ordered: true
             });
-            
+
             dataChannel.onopen = () => {
+                console.log('[DEBUG] Data channel opened for peer:', peerId);
                 this.log.info('Data channel opened', { peerId });
                 this.dataChannels.set(peerId, dataChannel);
             };
@@ -173,6 +179,7 @@ class WebRTCAudioManager extends EventEmitter {
             };
 
             dataChannel.onerror = (error) => {
+                console.error('[DEBUG] Data channel error for peer:', peerId, error.message);
                 this.log.error('Data channel error', { peerId, error: error.message });
             };
 
@@ -182,32 +189,37 @@ class WebRTCAudioManager extends EventEmitter {
                 iceGatheringResolve = resolve;
             });
             peerConnection.onicegatheringstatechange = () => {
+                console.log('[DEBUG] ICE gathering state changed to:', peerConnection.iceGatheringState);
                 if (peerConnection.iceGatheringState === 'complete') {
                     iceGatheringResolve();
                 }
             };
 
             // Create offer
+            console.log('[DEBUG] Creating WebRTC offer');
             const offer = await peerConnection.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: false,
                 voiceActivityDetection: false
             });
 
+            console.log('[DEBUG] Setting local description');
             await peerConnection.setLocalDescription(offer);
 
             // Wait for ICE gathering to complete or timeout
+            console.log('[DEBUG] Waiting for ICE gathering to complete');
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('ICE gathering timeout after 10 seconds')), 10000);
             });
             await Promise.race([iceGatheringPromise, timeoutPromise]);
+            console.log('[DEBUG] ICE gathering completed');
 
             // Update statistics
             this.connectionStats.totalConnections++;
 
-            this.log.info('Connection offer created', { 
-                peerId, 
-                offerType: offer.type 
+            this.log.info('Connection offer created', {
+                peerId,
+                offerType: offer.type
             });
 
             return {
@@ -220,9 +232,10 @@ class WebRTCAudioManager extends EventEmitter {
             };
 
         } catch (error) {
-            this.log.error('Failed to create connection offer', { 
-                peerId, 
-                error: error.message 
+            console.error('[DEBUG] Failed to create connection offer:', { peerId, error: error.message, stack: error.stack });
+            this.log.error('Failed to create connection offer', {
+                peerId,
+                error: error.message
             });
             this._cleanupFailedConnection(peerId);
             throw error;
@@ -302,23 +315,34 @@ class WebRTCAudioManager extends EventEmitter {
      * @private
      */
     _handleConnectionStateChange(peerId, state) {
+        console.log('[DEBUG] WebRTC connection state changed:', { peerId, state });
         this.log.debug('Connection state changed', { peerId, state });
 
         switch (state) {
             case 'connected':
+                console.log('[DEBUG] WebRTC peer connected successfully:', peerId);
                 this.connectedPeers.add(peerId);
                 this.pendingConnections.delete(peerId);
                 this.emit('peerConnected', { peerId });
                 break;
-                
+
             case 'disconnected':
-            case 'failed':
+                console.log('[DEBUG] WebRTC peer disconnected:', peerId);
                 this._handlePeerDisconnection(peerId);
                 break;
-                
+
+            case 'failed':
+                console.error('[DEBUG] WebRTC connection failed:', peerId);
+                this._handlePeerDisconnection(peerId);
+                break;
+
             case 'closed':
+                console.log('[DEBUG] WebRTC connection closed:', peerId);
                 this._cleanupPeerConnection(peerId);
                 break;
+
+            default:
+                console.log('[DEBUG] WebRTC connection state:', { peerId, state });
         }
     }
 

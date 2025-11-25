@@ -341,16 +341,20 @@
             }
 
             _handleBroadcastMessage(data) {
+                console.log('[DEBUG] Mobile speaker received broadcast message:', data);
                 this.log.log('Received broadcast message', data);
 
                 switch (data.type) {
                     case 'webrtc-offer':
+                        console.log('[DEBUG] Processing webrtc-offer message');
                         this._handleConnectionOffer(data);
                         break;
                     case 'webrtc-offer-candidate':
+                        console.log('[DEBUG] Processing webrtc-offer-candidate message');
                         this._handleOfferIceCandidate(data);
                         break;
                     case 'webrtc-answer-accepted':
+                        console.log('[DEBUG] Connection established - answer accepted');
                         this._updateConnectionStatus('Connection established!', false);
                         break;
                     default:
@@ -364,6 +368,7 @@
 
             async _connectToLaptop() {
                 try {
+                    console.log('[DEBUG] Mobile speaker connect button clicked');
                     this._updateConnectionStatus('Connecting...', false);
                     this.elements.connectBtn.disabled = true;
                     this.elements.connectBtn.innerHTML = 'Connecting... <span class="loading"></span>';
@@ -375,17 +380,20 @@
 
                     // Announce mobile device ready via BroadcastChannel
                     if (this.broadcastChannel) {
-                        this.broadcastChannel.postMessage({
+                        const readyMessage = {
                             type: 'mobile-ready',
                             peerId: this.deviceId,
                             timestamp: Date.now()
-                        });
+                        };
+                        this.broadcastChannel.postMessage(readyMessage);
+                        console.log('[DEBUG] Sent mobile-ready message:', readyMessage);
                         this.log.log('Announced mobile device ready');
                     } else {
                         throw new Error('BroadcastChannel not available');
                     }
 
                     // Create peer connection
+                    console.log('[DEBUG] Creating RTCPeerConnection');
                     this.peerConnection = new RTCPeerConnection({
                         iceServers: [
                             { urls: 'stun:stun.l.google.com:19302' },
@@ -396,6 +404,7 @@
                     // Set up event handlers
                     this.peerConnection.onicecandidate = (event) => {
                         if (event.candidate) {
+                            console.log('[DEBUG] Generated ICE candidate:', { type: event.candidate.type, candidate: event.candidate.candidate?.substring(0, 50) + '...' });
                             this._sendBroadcastMessage({
                                 type: 'webrtc-answer-candidate',
                                 candidate: event.candidate,
@@ -405,21 +414,26 @@
                     };
 
                     this.peerConnection.ontrack = (event) => {
+                        console.log('[DEBUG] Received remote audio track');
                         this._handleRemoteAudio(event.streams[0]);
                     };
 
                     this.peerConnection.ondatachannel = (event) => {
+                        console.log('[DEBUG] Received data channel');
                         this.dataChannel = event.channel;
                         this._setupDataChannel();
                     };
 
                     this.peerConnection.onconnectionstatechange = () => {
+                        console.log('[DEBUG] Connection state changed to:', this.peerConnection.connectionState);
                         this._handleConnectionStateChange();
                     };
 
+                    console.log('[DEBUG] Mobile speaker client initialized, waiting for offer from laptop');
                     this.log.log('Mobile speaker client initialized, waiting for offer from laptop');
 
                 } catch (error) {
+                    console.error('[DEBUG] Connection failed:', { error: error.message, stack: error.stack });
                     this.log.error('Connection failed', { error: error.message });
                     this._updateConnectionStatus(`Connection failed: ${error.message}`, true);
                     this.elements.connectBtn.disabled = false;
@@ -437,30 +451,39 @@
 
             async _handleConnectionOffer(data) {
                 try {
+                    console.log('[DEBUG] Handling connection offer from laptop:', { offerType: data.offer?.type });
                     this.log.log('Received connection offer from laptop');
 
                     // Set remote description
+                    console.log('[DEBUG] Setting remote description');
                     await this.peerConnection.setRemoteDescription(
                         new RTCSessionDescription(data.offer)
                     );
+                    console.log('[DEBUG] Remote description set successfully');
 
                     // Create answer
+                    console.log('[DEBUG] Creating answer');
                     const answer = await this.peerConnection.createAnswer();
+                    console.log('[DEBUG] Answer created:', { answerType: answer.type });
                     await this.peerConnection.setLocalDescription(answer);
+                    console.log('[DEBUG] Local description set');
 
                     // Send answer back to laptop
-                    this._sendBroadcastMessage({
+                    const answerMessage = {
                         type: 'webrtc-answer',
                         peerId: this.deviceId,
                         answer: {
                             type: answer.type,
                             sdp: answer.sdp
                         }
-                    });
+                    };
+                    this._sendBroadcastMessage(answerMessage);
+                    console.log('[DEBUG] Sent webrtc-answer message');
 
                     this._updateConnectionStatus('Establishing connection...', false);
 
                 } catch (error) {
+                    console.error('[DEBUG] Failed to handle connection offer:', { error: error.message, stack: error.stack });
                     this.log.error('Failed to handle connection offer', { error: error.message });
                     this._updateConnectionStatus(`Failed to connect: ${error.message}`, true);
                 }
@@ -635,14 +658,26 @@
 
             _handleOfferIceCandidate(data) {
                 const { peerId, candidate } = data;
+                console.log('[DEBUG] Received ICE candidate from offerer:', { peerId, candidateType: candidate?.type, candidate: candidate?.candidate?.substring(0, 50) + '...' });
                 this.log.debug(`Received ICE candidate from offerer: ${peerId}`);
 
                 try {
                     if (this.peerConnection && candidate) {
-                        this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                        // Reconstruct RTCIceCandidate from serialized data
+                        const iceCandidate = new RTCIceCandidate({
+                            candidate: candidate.candidate,
+                            sdpMid: candidate.sdpMid,
+                            sdpMLineIndex: candidate.sdpMLineIndex,
+                            usernameFragment: candidate.usernameFragment
+                        });
+                        this.peerConnection.addIceCandidate(iceCandidate);
+                        console.log('[DEBUG] ICE candidate added to peer connection successfully');
                         this.log.debug('ICE candidate added to peer connection');
+                    } else {
+                        console.warn('[DEBUG] Cannot add ICE candidate - peerConnection or candidate missing');
                     }
                 } catch (error) {
+                    console.error('[DEBUG] Failed to add ICE candidate:', { error: error.message });
                     this.log.error('Failed to add ICE candidate', { error: error.message });
                 }
             }

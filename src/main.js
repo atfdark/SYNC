@@ -1043,10 +1043,18 @@ class WebBluetoothAudioSync extends EventEmitter {
         this.webrtcManager.on('iceCandidate', (event) => {
             // Send ICE candidate to mobile peer via BroadcastChannel
             const { peerId, candidate } = event;
+            // Serialize the RTCIceCandidate object for BroadcastChannel
+            const serializedCandidate = candidate ? {
+                candidate: candidate.candidate,
+                sdpMid: candidate.sdpMid,
+                sdpMLineIndex: candidate.sdpMLineIndex,
+                usernameFragment: candidate.usernameFragment
+            } : null;
+
             this._sendMobileBroadcastMessage({
                 type: 'webrtc-offer-candidate',
                 peerId,
-                candidate
+                candidate: serializedCandidate
             });
             this.emit('iceCandidate', event);
         });
@@ -1135,16 +1143,21 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleMobileReady(data) {
         const { peerId } = data;
 
+        console.log('[DEBUG] Mobile ready message received:', { peerId, mobileOutputMode: this.mobileOutputMode, data });
+
         if (!this.mobileOutputMode) {
             this.log.warn('Mobile ready received but mobile output mode not enabled', { peerId });
+            console.warn('[DEBUG] Mobile output mode not enabled, ignoring mobile-ready message');
             return;
         }
 
         this.log.info('Mobile device ready, creating connection offer', { peerId });
+        console.log('[DEBUG] Creating WebRTC connection offer for peer:', peerId);
 
         try {
             // Create WebRTC offer for the mobile peer
             const offerData = await this.createMobileConnectionOffer(peerId);
+            console.log('[DEBUG] WebRTC offer created successfully:', { peerId, offerType: offerData.offer.type });
 
             // Send offer via BroadcastChannel
             this._sendMobileBroadcastMessage({
@@ -1154,12 +1167,14 @@ class WebBluetoothAudioSync extends EventEmitter {
             });
 
             this.log.info('WebRTC offer sent to mobile peer', { peerId });
+            console.log('[DEBUG] WebRTC offer sent via BroadcastChannel to peer:', peerId);
 
         } catch (error) {
             this.log.error('Failed to create and send offer to mobile peer', {
                 peerId,
                 error: error.message
             });
+            console.error('[DEBUG] Failed to create/send WebRTC offer:', { peerId, error: error.message, stack: error.stack });
         }
     }
 
@@ -1171,22 +1186,26 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleWebRTCAnswer(data) {
         const { peerId, answer } = data;
 
+        console.log('[DEBUG] WebRTC answer received from mobile peer:', { peerId, answerType: answer?.type });
         this.log.info('Received WebRTC answer from mobile peer', { peerId });
 
         try {
             await this.acceptMobileConnectionAnswer(peerId, answer);
+            console.log('[DEBUG] WebRTC answer accepted successfully for peer:', peerId);
 
             // Notify mobile that answer was accepted
             this._sendMobileBroadcastMessage({
                 type: 'webrtc-answer-accepted',
                 peerId
             });
+            console.log('[DEBUG] Sent webrtc-answer-accepted message to peer:', peerId);
 
         } catch (error) {
             this.log.error('Failed to accept WebRTC answer', {
                 peerId,
                 error: error.message
             });
+            console.error('[DEBUG] Failed to accept WebRTC answer:', { peerId, error: error.message, stack: error.stack });
         }
     }
 
@@ -1198,15 +1217,18 @@ class WebBluetoothAudioSync extends EventEmitter {
     async _handleWebRTCAnswerCandidate(data) {
         const { peerId, candidate } = data;
 
+        console.log('[DEBUG] ICE candidate received from mobile peer:', { peerId, candidateType: candidate?.type, candidate: candidate?.candidate?.substring(0, 50) + '...' });
         this.log.debug('Received ICE candidate from mobile peer', { peerId });
 
         try {
             await this.addMobileIceCandidate(peerId, candidate);
+            console.log('[DEBUG] ICE candidate added successfully for peer:', peerId);
         } catch (error) {
             this.log.error('Failed to add ICE candidate from mobile peer', {
                 peerId,
                 error: error.message
             });
+            console.error('[DEBUG] Failed to add ICE candidate:', { peerId, error: error.message });
         }
     }
 

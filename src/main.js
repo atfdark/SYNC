@@ -81,7 +81,10 @@ class WebBluetoothAudioSync extends EventEmitter {
         
         // Mobile device tracking
         this.mobilePeers = new Set();
-        
+
+        // BroadcastChannel for mobile signaling
+        this.mobileBroadcastChannel = null;
+
         // Dual output configuration
         this.dualOutputMode = false;
         this.mobileOutputMode = false;
@@ -1016,21 +1019,21 @@ class WebBluetoothAudioSync extends EventEmitter {
         this.deviceManager.on('deviceConnected', (event) => {
             this._handleDeviceConnected(event);
         });
-        
+
         this.deviceManager.on('deviceDisconnected', (event) => {
             this._handleDeviceDisconnected(event);
         });
-        
+
         // Master Clock events
         this.masterClock.on('tick', (event) => {
             this._handleMasterClockTick(event);
         });
-        
+
         // Drift Correction events
         this.driftCorrection.on('correctionsApplied', (event) => {
             this._handleDriftCorrectionsApplied(event);
         });
-        
+
         // System Audio Capture events
         this.systemAudioCapture.on('audioFrame', (event) => {
             // Audio frames are processed in _processSystemAudioFrame
@@ -1038,6 +1041,13 @@ class WebBluetoothAudioSync extends EventEmitter {
 
         // WebRTC Manager events
         this.webrtcManager.on('iceCandidate', (event) => {
+            // Send ICE candidate to mobile peer via BroadcastChannel
+            const { peerId, candidate } = event;
+            this._sendMobileBroadcastMessage({
+                type: 'webrtc-offer-candidate',
+                peerId,
+                candidate
+            });
             this.emit('iceCandidate', event);
         });
 
@@ -1048,6 +1058,9 @@ class WebBluetoothAudioSync extends EventEmitter {
         this.webrtcManager.on('peerDisconnected', (event) => {
             this.emit('mobilePeerDisconnected', event);
         });
+
+        // Set up BroadcastChannel for mobile signaling
+        this._setupMobileBroadcastChannel();
     }
 
     /**
@@ -1059,11 +1072,156 @@ class WebBluetoothAudioSync extends EventEmitter {
         this.driftCorrection.on('deviceAdded', (event) => {
             const deviceId = event.deviceId;
             const deviceClock = this.deviceClocks.get(deviceId);
-            
+
             if (deviceClock) {
                 this.driftCorrection.addDevice(deviceId, deviceClock);
             }
         });
+    }
+
+    /**
+     * Set up BroadcastChannel for mobile device signaling
+     * @private
+     */
+    _setupMobileBroadcastChannel() {
+        if (typeof BroadcastChannel === 'undefined') {
+            this.log.error('BroadcastChannel not supported in this browser');
+            return;
+        }
+
+        this.mobileBroadcastChannel = new BroadcastChannel('syncplay-mobile');
+        this.log.info('Mobile BroadcastChannel initialized');
+
+        this.mobileBroadcastChannel.onmessage = (event) => {
+            this._handleMobileBroadcastMessage(event.data);
+        };
+    }
+
+    /**
+     * Handle messages from mobile devices via BroadcastChannel
+     * @param {object} data - Message data
+     * @private
+     */
+    async _handleMobileBroadcastMessage(data) {
+        this.log.info('Received mobile broadcast message', { type: data.type, peerId: data.peerId });
+
+        try {
+            switch (data.type) {
+                case 'mobile-ready':
+                    await this._handleMobileReady(data);
+                    break;
+                case 'webrtc-answer':
+                    await this._handleWebRTCAnswer(data);
+                    break;
+                case 'webrtc-answer-candidate':
+                    await this._handleWebRTCAnswerCandidate(data);
+                    break;
+                default:
+                    this.log.debug('Unknown mobile broadcast message type', data.type);
+            }
+        } catch (error) {
+            this.log.error('Failed to handle mobile broadcast message', {
+                type: data.type,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Handle mobile device ready message
+     * @param {object} data - Mobile ready data
+     * @private
+     */
+    async _handleMobileReady(data) {
+        const { peerId } = data;
+
+        if (!this.mobileOutputMode) {
+            this.log.warn('Mobile ready received but mobile output mode not enabled', { peerId });
+            return;
+        }
+
+        this.log.info('Mobile device ready, creating connection offer', { peerId });
+
+        try {
+            // Create WebRTC offer for the mobile peer
+            const offerData = await this.createMobileConnectionOffer(peerId);
+
+            // Send offer via BroadcastChannel
+            this._sendMobileBroadcastMessage({
+                type: 'webrtc-offer',
+                peerId,
+                offer: offerData.offer
+            });
+
+            this.log.info('WebRTC offer sent to mobile peer', { peerId });
+
+        } catch (error) {
+            this.log.error('Failed to create and send offer to mobile peer', {
+                peerId,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Handle WebRTC answer from mobile peer
+     * @param {object} data - Answer data
+     * @private
+     */
+    async _handleWebRTCAnswer(data) {
+        const { peerId, answer } = data;
+
+        this.log.info('Received WebRTC answer from mobile peer', { peerId });
+
+        try {
+            await this.acceptMobileConnectionAnswer(peerId, answer);
+
+            // Notify mobile that answer was accepted
+            this._sendMobileBroadcastMessage({
+                type: 'webrtc-answer-accepted',
+                peerId
+            });
+
+        } catch (error) {
+            this.log.error('Failed to accept WebRTC answer', {
+                peerId,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Handle ICE candidate from mobile peer
+     * @param {object} data - ICE candidate data
+     * @private
+     */
+    async _handleWebRTCAnswerCandidate(data) {
+        const { peerId, candidate } = data;
+
+        this.log.debug('Received ICE candidate from mobile peer', { peerId });
+
+        try {
+            await this.addMobileIceCandidate(peerId, candidate);
+        } catch (error) {
+            this.log.error('Failed to add ICE candidate from mobile peer', {
+                peerId,
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Send message to mobile devices via BroadcastChannel
+     * @param {object} message - Message to send
+     * @private
+     */
+    _sendMobileBroadcastMessage(message) {
+        if (this.mobileBroadcastChannel) {
+            this.mobileBroadcastChannel.postMessage(message);
+            this.log.debug('Sent mobile broadcast message', { type: message.type, peerId: message.peerId });
+        } else {
+            this.log.error('Mobile BroadcastChannel not available');
+        }
     }
 
     /**

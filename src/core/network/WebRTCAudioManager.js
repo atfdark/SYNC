@@ -130,7 +130,7 @@ class WebRTCAudioManager extends EventEmitter {
         }
 
         try {
-            this.log.info('Creating connection offer', { peerId });
+            this.log.info('Creating connection offer', { peerId, supported: this.isSupported() });
 
             // Create peer connection
             const peerConnection = new RTCPeerConnection({

@@ -72,19 +72,10 @@ class SystemAudioCapture extends EventEmitter {
                 });
 
                 try {
-                    this.audioContext = new AudioContextClass({
-                        sampleRate: this.sampleRate
-                    });
-                    this.log.debug('AudioContext created successfully', {
-                        state: this.audioContext.state,
-                        sampleRate: this.audioContext.sampleRate
-                    });
+                    this.audioContext = new AudioContextClass({ latencyHint: 'interactive' });
                 } catch (error) {
-                    this.log.error('Failed to create AudioContext', {
-                        error: error.message,
-                        AudioContextClass: AudioContextClass.name
-                    });
-                    throw error;
+                    console.log('Failed to create AudioContext:', error);
+                    this.audioContext = null;
                 }
 
                 // Resume AudioContext if it's suspended (required in modern browsers)

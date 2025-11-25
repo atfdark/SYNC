@@ -862,6 +862,7 @@
                 <!-- Connection QR/URL -->
                 <div class="connection-qr" id="connectionQR" style="display: none;">
                     <div>Visit URL on your mobile device:</div>
+                    <img src="assets/icons/QR CODE.png" width="100" height="100" alt="QR Code" style="display: block; margin: 10px auto; border-radius: 10px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);">
                     <div class="connection-url" id="connectionURL">
                         https://your-domain.com/mobile-speaker.html
                     </div>
@@ -1545,9 +1546,14 @@
                         }
 
                         // Enable dual output mode
-                        await this.audioSyncSystem.enableDualOutput(true);
+                        try {
+                            await this.audioSyncSystem.enableDualOutput(true);
+                        } catch (error) {
+                            console.error('AudioContext constructor error when enabling dual output:', error);
+                            throw error;
+                        }
                         this.elements.dualOutputToggle.classList.add('active');
-                        
+            
                         this.log('Dual output mode enabled');
                         
                     } else {

@@ -480,7 +480,8 @@ class WebBluetoothAudioSync extends EventEmitter {
      */
     async startSystemAudioCapture() {
         if (!this.dualOutputMode) {
-            throw new Error('Dual output mode must be enabled first');
+            alert("Please enable dual output mode first to start system audio capture.");
+            return;
         }
 
         if (!this.systemAudioCapture.getIsCapturing()) {

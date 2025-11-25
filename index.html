@@ -987,7 +987,7 @@
             async _initializeSystem() {
                 try {
                     this.log('Initializing SyncPlay Music Player...');
-
+    
                     // Initialize the audio sync system
                     this.audioSyncSystem = new WebBluetoothAudioSync({
                         syncTolerance: 1,
@@ -995,22 +995,36 @@
                         sampleRate: 44100,
                         enableLogging: true
                     });
-
-                    await this.audioSyncSystem.initialize();
-                    this.isInitialized = true;
-
-                    this._updateConnectionStatus('Ready to connect', false);
-                    this.log('System initialized successfully');
-
-                    // Set up system event handlers
-                    this._setupSystemEventHandlers();
-
-                    // Auto-scan and connect to devices for demo
+    
+                    // Try to fully initialize the system, but gracefully fall back to demo mode
+                    try {
+                        await this.audioSyncSystem.initialize();
+                        this.isInitialized = true;
+    
+                        this._updateConnectionStatus('Ready to connect', false);
+                        this.log('System initialized successfully');
+                    } catch (error) {
+                        // Environment validation or subsystem init failed
+                        // Treat this as a degraded "demo" mode instead of total failure
+                        this.isInitialized = false;
+                        this.log(`Initialization error (falling back to demo mode): ${error.message}`);
+                        this._updateConnectionStatus('Bluetooth unavailable - running in demo mode', true);
+                    }
+    
+                    // Always set up system event handlers once we have an audioSyncSystem instance
+                    if (this.audioSyncSystem) {
+                        this._setupSystemEventHandlers();
+                    }
+    
+                    // Auto-scan and connect to devices for demo (uses simulated devices when needed)
                     setTimeout(() => {
-                        this._scanForDevices();
+                        if (this.audioSyncSystem) {
+                            this._scanForDevices();
+                        }
                     }, 1000);
-
+    
                 } catch (error) {
+                    // Constructor failed or some truly fatal error occurred
                     this.log(`Initialization error: ${error.message}`);
                     this._updateConnectionStatus('Initialization failed', true);
                 }
@@ -1421,30 +1435,63 @@
             }
 
             async _scanForDevices() {
+                // Guard against missing or uninitialized audio system
+                if (!this.audioSyncSystem) {
+                    this.log('Cannot scan: audio system not initialized');
+                    this._updateConnectionStatus('System not ready. Please reload the page.', true);
+                    return;
+                }
+    
+                if (!this.isInitialized) {
+                    // Initialization failed earlier (e.g. no Web Bluetooth / insecure origin)
+                    // but we can still run in demo mode using simulated devices
+                    this.log('System not fully initialized. Running device scan in demo mode.');
+                    this._updateConnectionStatus('Bluetooth not available - showing demo speakers only', true);
+                }
+    
                 this.log('Scanning for Bluetooth speakers...');
-
+    
+                // Update Scan & Connect button state during scan
+                this.elements.scanBtn.disabled = true;
+                this.elements.scanBtn.textContent = 'Scanning...';
+    
                 try {
-                    // Use the device manager to scan for devices
+                    // Use the device manager to scan for devices (simulated in demo mode)
                     const availableDevices = await this.audioSyncSystem.deviceManager.scanForDevices();
-
+    
                     this.log(`Found ${availableDevices.length} devices`);
-
-                    // Connect to found devices
-                    if (availableDevices.length > 0) {
-                        const deviceConfigs = availableDevices.map(device => ({
-                            id: device.id,
-                            name: device.name,
-                            serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb', // A2DP UUID
-                            isSimulated: device.isSimulated || false
-                        }));
-
-                        const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
-                        this.log(`Connection results:`, results);
+    
+                    if (availableDevices.length === 0) {
+                        this._updateConnectionStatus('No speakers found', true);
+                        return;
                     }
-
+    
+                    // Connect to found devices
+                    const deviceConfigs = availableDevices.map(device => ({
+                        id: device.id,
+                        name: device.name,
+                        serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb', // A2DP UUID
+                        isSimulated: device.isSimulated || false
+                    }));
+    
+                    const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
+                    const successful = results.filter(r => r && r.success).length;
+    
+                    if (successful > 0) {
+                        this._updateConnectionStatus(`${successful} speaker(s) connected`, false);
+                    } else {
+                        this._updateConnectionStatus('Failed to connect to any speakers', true);
+                    }
+    
+                    this.log('Connection results:', results);
+    
                 } catch (error) {
                     this.log(`Device scan failed: ${error.message}`);
-                    this._updateConnectionStatus('Scan failed', true);
+                    this._updateConnectionStatus(`Scan failed: ${error.message}`, true);
+                } finally {
+                    // Restore Scan & Connect button state
+                    this.elements.scanBtn.disabled = false;
+                    this.elements.scanBtn.textContent = 'Scan & Connect';
                 }
             }
 
@@ -1726,12 +1773,12 @@
             }
 
             async _handleMobileDeviceReady(peerId) {
-                this.log.log(`Mobile device ready: ${peerId}`);
-
+                this.log(`Mobile device ready: ${peerId}`);
+    
                 try {
                     // Create connection offer for the mobile device
                     const offerData = await this.audioSyncSystem.createMobileConnectionOffer(peerId);
-
+    
                     // Send offer via broadcast channel
                     if (this.mobileBroadcastChannel) {
                         this.mobileBroadcastChannel.postMessage({
@@ -1739,30 +1786,36 @@
                             peerId: peerId,
                             offer: offerData.offer
                         });
-                        this.log.log(`Sent WebRTC offer to mobile device: ${peerId}`);
+                        this.log(`Sent WebRTC offer to mobile device: ${peerId}`);
+                    } else {
+                        this.log('Mobile broadcast channel not available when trying to send offer');
                     }
                 } catch (error) {
-                    this.log.error(`Failed to create offer for mobile device ${peerId}`, { error: error.message });
+                    this.log(`Failed to create offer for mobile device ${peerId}: ${error.message}`);
+                    console.error(`Failed to create offer for mobile device ${peerId}`, { error });
                 }
             }
 
             async _handleWebRTCAnswer(data) {
                 const { peerId, answer } = data;
-                this.log.log(`Received WebRTC answer from ${peerId}`);
-
+                this.log(`Received WebRTC answer from ${peerId}`);
+    
                 try {
                     await this.audioSyncSystem.acceptMobileConnectionAnswer(peerId, answer);
-                    this.log.log(`WebRTC connection established with ${peerId}`);
-
+                    this.log(`WebRTC connection established with ${peerId}`);
+    
                     // Notify mobile device that connection is accepted
                     if (this.mobileBroadcastChannel) {
                         this.mobileBroadcastChannel.postMessage({
                             type: 'webrtc-answer-accepted',
                             peerId: peerId
                         });
+                    } else {
+                        this.log('Mobile broadcast channel not available when trying to send answer-accepted notification');
                     }
                 } catch (error) {
-                    this.log.error(`Failed to accept WebRTC answer from ${peerId}`, { error: error.message });
+                    this.log(`Failed to accept WebRTC answer from ${peerId}: ${error.message}`);
+                    console.error(`Failed to accept WebRTC answer from ${peerId}`, { error });
                 }
             }
 
@@ -1789,23 +1842,48 @@
             }
 
             _updateMobileOutputUI(enabled) {
+                const section = this.elements.mobileConnectivitySection;
+                let noteEl = section.querySelector('#mobileConnectionNote');
+    
                 if (enabled) {
                     // Show mobile device list area
                     this.elements.mobileDeviceList.style.display = 'block';
                     
                     if (this.audioSyncSystem.isWebRTCSupported()) {
                         this._showMobileConnectionInfo();
+    
+                        // Add or show explanatory note about BroadcastChannel limitations
+                        if (!noteEl) {
+                            noteEl = document.createElement('div');
+                            noteEl.id = 'mobileConnectionNote';
+                            noteEl.className = 'system-audio-info';
+                            noteEl.innerHTML = `
+                                <p>Note: Current version uses browser BroadcastChannel for signaling. Connection will only work when this page and the mobile speaker page are opened in the same browser on the same device.</p>
+                                <p>For real phone/tablet connections across different devices or networks, a small signaling server will be required.</p>
+                            `;
+                            section.appendChild(noteEl);
+                        } else {
+                            noteEl.style.display = 'block';
+                        }
                     } else {
                         this.elements.mobileDeviceList.innerHTML = `
                             <div style="color: #ff6b6b;">
                                 WebRTC not supported in this browser for mobile connectivity.
                             </div>
                         `;
+    
+                        if (noteEl) {
+                            noteEl.style.display = 'none';
+                        }
                     }
                 } else {
                     // Hide mobile device list and connection info
                     this.elements.mobileDeviceList.style.display = 'none';
                     this.elements.connectionQR.style.display = 'none';
+    
+                    if (noteEl) {
+                        noteEl.style.display = 'none';
+                    }
                 }
             }
 

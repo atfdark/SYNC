@@ -309,14 +309,19 @@ class DeviceManager extends EventEmitter {
 
     /**
      * Scan for available Bluetooth devices (simulation for demo)
+     *
+     * Important: Web Bluetooth does not support passive device scanning like classic Bluetooth.
+     * The user must explicitly choose a device via `navigator.bluetooth.requestDevice`, and
+     * browsers do not expose a background "discovery" API. To allow the rest of the system
+     * (connection management, sync engine, UI) to be exercised without real hardware or full
+     * Web Bluetooth support, this method returns a fixed set of simulated devices.
+     *
      * @param {object} scanOptions - Scan options
      * @returns {Promise<Array>} Array of available devices
      */
     async scanForDevices(scanOptions = {}) {
-        this.log.info('Scanning for Bluetooth devices', scanOptions);
-
-        // Note: Web Bluetooth doesn't support device scanning like classic Bluetooth
-        // This is a simulation for demo purposes
+        this.log.info('Scanning for Bluetooth devices (simulation mode)', scanOptions);
+    
         const simulatedDevices = [
             {
                 id: 'sim_device_1',
@@ -343,9 +348,9 @@ class DeviceManager extends EventEmitter {
                 isSimulated: true
             }
         ];
-
+    
         this.emit('deviceScanCompleted', { devices: simulatedDevices });
-
+    
         return simulatedDevices;
     }
 

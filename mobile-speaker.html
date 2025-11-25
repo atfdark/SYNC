@@ -294,7 +294,7 @@
                 this.isConnected = false;
                 this.deviceId = this._generateDeviceId();
                 this.broadcastChannel = null;
-
+    
                 // UI elements
                 this.elements = {
                     connectBtn: document.getElementById('connectBtn'),
@@ -308,9 +308,15 @@
                     muteBtn: document.getElementById('muteBtn'),
                     audioInfo: document.getElementById('audioInfo')
                 };
-
+    
                 this._initializeUI();
                 this._setupBroadcastChannel();
+    
+                // One-time console note about current signaling limitations
+                this.log.log(
+                    'Note: This mobile client currently relies on BroadcastChannel-based signaling. It will only auto-connect when running in the same browser instance and origin as the main SyncPlay page. Cross-device connections will require a future signaling server.'
+                );
+    
                 this._setupEventListeners();
             }
 
@@ -453,6 +459,17 @@
                 try {
                     console.log('[DEBUG] Handling connection offer from laptop:', { offerType: data.offer?.type });
                     this.log.log('Received connection offer from laptop');
+
+                    // Validate offer format
+                    if (!data.offer || typeof data.offer !== 'object') {
+                        throw new Error('Invalid offer format: offer must be an object');
+                    }
+                    if (!data.offer.type || !data.offer.sdp) {
+                        throw new Error('Invalid offer format: missing type or sdp');
+                    }
+                    if (data.offer.type !== 'offer') {
+                        throw new Error(`Invalid offer type: expected 'offer', got '${data.offer.type}'`);
+                    }
 
                     // Set remote description
                     console.log('[DEBUG] Setting remote description');

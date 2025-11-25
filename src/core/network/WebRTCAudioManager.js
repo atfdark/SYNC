@@ -71,30 +71,53 @@ class WebRTCAudioManager extends EventEmitter {
                 throw new Error('AudioContext not available in this browser');
             }
 
+            // Try to create AudioContext with different options for better compatibility
             try {
-                this.audioContext = new AudioContextClass({
-                    sampleRate: 44100
-                });
-            } catch (error) {
-                if (error.message.includes('cannot be called as a function')) {
-                    this.audioContext = AudioContextClass({
+                // First try without options
+                this.audioContext = new AudioContextClass();
+            } catch (firstError) {
+                this.log.warn('Failed to create AudioContext without options, trying with sampleRate', { error: firstError.message });
+                try {
+                    // Try with sampleRate option
+                    this.audioContext = new AudioContextClass({
                         sampleRate: 44100
                     });
-                } else {
-                    this.log.error('Failed to instantiate AudioContext', { error: error.message });
-                    this.audioContext = null;
+                } catch (secondError) {
+                    this.log.warn('Failed to create AudioContext with sampleRate, trying legacy constructor', { error: secondError.message });
+                    try {
+                        // Try legacy constructor syntax
+                        this.audioContext = AudioContextClass({
+                            sampleRate: 44100
+                        });
+                    } catch (thirdError) {
+                        this.log.error('All AudioContext constructor attempts failed', {
+                            firstError: firstError.message,
+                            secondError: secondError.message,
+                            thirdError: thirdError.message
+                        });
+                        this.audioContext = null;
+                    }
                 }
             }
 
-            // Resume AudioContext if it's suspended (required in modern browsers)
-            if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
-            }
+            if (this.audioContext) {
+                // Resume AudioContext if it's suspended (required in modern browsers)
+                if (this.audioContext.state === 'suspended') {
+                    try {
+                        await this.audioContext.resume();
+                    } catch (resumeError) {
+                        this.log.warn('Failed to resume AudioContext', { error: resumeError.message });
+                        // Continue anyway, as some contexts may work suspended
+                    }
+                }
 
-            this.log.info('WebRTC Audio context initialized successfully', {
-                state: this.audioContext.state,
-                sampleRate: this.audioContext.sampleRate
-            });
+                this.log.info('WebRTC Audio context initialized successfully', {
+                    state: this.audioContext.state,
+                    sampleRate: this.audioContext.sampleRate
+                });
+            } else {
+                throw new Error('AudioContext creation failed with all methods');
+            }
 
         } catch (error) {
             this.log.error('Failed to initialize audio context', {
@@ -209,7 +232,7 @@ class WebRTCAudioManager extends EventEmitter {
             // Wait for ICE gathering to complete or timeout
             console.log('[DEBUG] Waiting for ICE gathering to complete');
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('ICE gathering timeout after 10 seconds')), 10000);
+                setTimeout(() => reject(new Error('ICE gathering timeout after 15 seconds')), 15000);
             });
             await Promise.race([iceGatheringPromise, timeoutPromise]);
             console.log('[DEBUG] ICE gathering completed');
@@ -250,13 +273,26 @@ class WebRTCAudioManager extends EventEmitter {
      */
     async acceptConnectionAnswer(peerId, answer) {
         try {
+            // Validate answer format
+            if (!answer || typeof answer !== 'object') {
+                throw new Error('Invalid answer format: answer must be an object');
+            }
+            if (!answer.type || !answer.sdp) {
+                throw new Error('Invalid answer format: missing type or sdp');
+            }
+            if (answer.type !== 'answer') {
+                throw new Error(`Invalid answer type: expected 'answer', got '${answer.type}'`);
+            }
+
             const peerConnection = this.connections.get(peerId);
 
             if (!peerConnection) {
                 throw new Error(`No pending connection found for peer ${peerId}`);
             }
 
+            console.log('[DEBUG] Setting remote description for answer');
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('[DEBUG] Remote description set successfully');
 
             this.pendingConnections.delete(peerId);
             this.connectedPeers.add(peerId);
@@ -271,6 +307,7 @@ class WebRTCAudioManager extends EventEmitter {
             this.emit('connectionEstablished', { peerId });
 
         } catch (error) {
+            console.error('[DEBUG] Failed to accept connection answer:', { peerId, error: error.message, stack: error.stack });
             this.log.error('Failed to accept connection answer', {
                 peerId,
                 error: error.message

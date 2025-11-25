@@ -899,6 +899,21 @@
         // Import the main system
         import { WebBluetoothAudioSync } from './src/main.js';
 
+        // Patch for AudioContext compatibility
+        const originalAudioContext = window.AudioContext;
+        window.AudioContext = function(...args) {
+            try {
+                return new originalAudioContext(...args);
+            } catch (e) {
+                if (e.message.includes('cannot be called as a function')) {
+                    return originalAudioContext(...args);
+                } else {
+                    throw e;
+                }
+            }
+        };
+
+        
         /**
          * Music Player with Multi-Speaker Synchronization
          */

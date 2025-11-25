@@ -433,15 +433,19 @@ class WebBluetoothAudioSync extends EventEmitter {
      * @param {boolean} enable - Enable dual output
      */
     async enableDualOutput(enable = true) {
-        this.dualOutputMode = enable;
-        
-        if (enable) {
-            this.log.info('Enabling dual output mode');
-            this.emit('dualOutputEnabled');
-        } else {
-            this.log.info('Disabling dual output mode');
-            await this.disableSystemAudioCapture();
-            this.emit('dualOutputDisabled');
+        try {
+            this.dualOutputMode = enable;
+
+            if (enable) {
+                this.log.info('Enabling dual output mode');
+                this.emit('dualOutputEnabled');
+            } else {
+                this.log.info('Disabling dual output mode');
+                await this.disableSystemAudioCapture();
+                this.emit('dualOutputDisabled');
+            }
+        } catch (error) {
+            this.log.error('Error enabling dual output:', error);
         }
     }
 

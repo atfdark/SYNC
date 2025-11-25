@@ -71,9 +71,20 @@ class WebRTCAudioManager extends EventEmitter {
                 throw new Error('AudioContext not available in this browser');
             }
 
-            this.audioContext = new AudioContextClass({
-                sampleRate: 44100
-            });
+            try {
+                this.audioContext = new AudioContextClass({
+                    sampleRate: 44100
+                });
+            } catch (error) {
+                if (error.message.includes('cannot be called as a function')) {
+                    this.audioContext = AudioContextClass({
+                        sampleRate: 44100
+                    });
+                } else {
+                    this.log.error('Failed to instantiate AudioContext', { error: error.message });
+                    this.audioContext = null;
+                }
+            }
 
             // Resume AudioContext if it's suspended (required in modern browsers)
             if (this.audioContext.state === 'suspended') {

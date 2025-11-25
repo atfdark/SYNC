@@ -86,7 +86,6 @@ class DriftCorrection extends EventEmitter {
         });
         
         this.log.debug('Device added for drift correction', { deviceId });
-        this.emit('deviceAdded', { deviceId });
     }
 
     /**

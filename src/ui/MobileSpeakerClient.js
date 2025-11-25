@@ -117,15 +117,16 @@ class MobileSpeakerClient {
                 throw new Error('WebRTC not supported in this browser');
             }
 
-            // Connect to signaling server
-            this.signaling.connect(this.deviceId);
-
-            // Announce mobile device ready via WebSocket
-            this.signaling.sendMessage({
-                type: 'mobile-ready',
-                timestamp: Date.now()
+            // Connect to signaling server and wait for open event
+            this.signaling.on('open', () => {
+                this.log.log('Signaling channel open. Announcing mobile device ready.');
+                // Announce mobile device ready via WebSocket
+                this.signaling.sendMessage({
+                    type: 'mobile-ready',
+                    timestamp: Date.now()
+                });
             });
-            this.log.log('Announced mobile device ready');
+            this.signaling.connect(this.deviceId);
 
             // Create peer connection
             console.log('[DEBUG] Creating RTCPeerConnection');

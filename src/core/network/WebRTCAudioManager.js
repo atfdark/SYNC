@@ -12,7 +12,12 @@ class WebRTCAudioManager extends EventEmitter {
         // Configuration
         this.iceServers = options.iceServers || [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            }
         ];
         this.audioConstraints = {
             echoCancellation: false,
@@ -295,7 +300,6 @@ class WebRTCAudioManager extends EventEmitter {
             console.log('[DEBUG] Remote description set successfully');
 
             this.pendingConnections.delete(peerId);
-            this.connectedPeers.add(peerId);
 
             // Update statistics
             const connectionTime = Date.now() - (this.connectionStats.lastConnectionStart || Date.now());

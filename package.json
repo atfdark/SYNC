@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "npx vercel dev",
     "build": "echo 'Static site - no build required'",
-    "start": "npx vercel dev",
+    "start": "node server/server.js",
     "test": "echo 'Tests can be run manually in browser'",
     "lint": "echo 'No linting configured for static site'",
     "format": "echo 'Code formatting handled by IDE'"

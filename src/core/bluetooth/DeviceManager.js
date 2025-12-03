@@ -308,50 +308,75 @@ class DeviceManager extends EventEmitter {
     }
 
     /**
-     * Scan for available Bluetooth devices (simulation for demo)
+     * Scan for available Bluetooth devices
      *
-     * Important: Web Bluetooth does not support passive device scanning like classic Bluetooth.
-     * The user must explicitly choose a device via `navigator.bluetooth.requestDevice`, and
-     * browsers do not expose a background "discovery" API. To allow the rest of the system
-     * (connection management, sync engine, UI) to be exercised without real hardware or full
-     * Web Bluetooth support, this method returns a fixed set of simulated devices.
+     * Web Bluetooth requires user interaction to scan. This method attempts to request
+     * a device to trigger the permission dialog, then falls back to simulated devices
+     * for demo purposes if no real device is selected or Web Bluetooth is unavailable.
      *
      * @param {object} scanOptions - Scan options
      * @returns {Promise<Array>} Array of available devices
      */
     async scanForDevices(scanOptions = {}) {
-        this.log.info('Scanning for Bluetooth devices (simulation mode)', scanOptions);
-    
-        const simulatedDevices = [
-            {
-                id: 'sim_device_1',
-                name: 'Bluetooth Speaker 1',
+        this.log.info('Scanning for Bluetooth devices', scanOptions);
+        console.log('[DEBUG] Starting Bluetooth device scan');
+
+        try {
+            // First, try to request a real Bluetooth device to trigger permission
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['0000110b-0000-1000-8000-00805f9b34fb'] // A2DP
+            });
+
+            console.log('[DEBUG] Real Bluetooth device selected:', device.name || device.id);
+
+            const realDevices = [{
+                id: device.id,
+                name: device.name || 'Unknown Device',
                 type: 'audio_output',
-                signalStrength: -45,
-                battery: 85,
-                isSimulated: true
-            },
-            {
-                id: 'sim_device_2',
-                name: 'Bluetooth Speaker 2',
-                type: 'audio_output',
-                signalStrength: -52,
-                battery: 67,
-                isSimulated: true
-            },
-            {
-                id: 'sim_device_3',
-                name: 'Wireless Headphones',
-                type: 'audio_output',
-                signalStrength: -38,
-                battery: 92,
-                isSimulated: true
-            }
-        ];
-    
-        this.emit('deviceScanCompleted', { devices: simulatedDevices });
-    
-        return simulatedDevices;
+                signalStrength: -50, // Estimated
+                battery: null,
+                isSimulated: false,
+                device: device
+            }];
+
+            this.emit('deviceScanCompleted', { devices: realDevices });
+            return realDevices;
+
+        } catch (error) {
+            console.log('[DEBUG] Bluetooth scan failed or cancelled, falling back to demo mode:', error.message);
+
+            // Fall back to simulated devices for demo
+            const simulatedDevices = [
+                {
+                    id: 'sim_device_1',
+                    name: 'Bluetooth Speaker 1',
+                    type: 'audio_output',
+                    signalStrength: -45,
+                    battery: 85,
+                    isSimulated: true
+                },
+                {
+                    id: 'sim_device_2',
+                    name: 'Bluetooth Speaker 2',
+                    type: 'audio_output',
+                    signalStrength: -52,
+                    battery: 67,
+                    isSimulated: true
+                },
+                {
+                    id: 'sim_device_3',
+                    name: 'Wireless Headphones',
+                    type: 'audio_output',
+                    signalStrength: -38,
+                    battery: 92,
+                    isSimulated: true
+                }
+            ];
+
+            this.emit('deviceScanCompleted', { devices: simulatedDevices });
+            return simulatedDevices;
+        }
     }
 
     /**

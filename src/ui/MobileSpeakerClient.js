@@ -54,7 +54,8 @@ class MobileSpeakerClient {
     }
 
     _setupSignaling() {
-        const SIGNALING_SERVER_URL = 'https://your-signaling-app.up.railway.app'; // Socket.io server URL
+        // Use the same host as the current page for signaling
+        const SIGNALING_SERVER_URL = window.location.protocol + '//' + window.location.host;
         this.signaling = new WebSocketSignaling(SIGNALING_SERVER_URL);
 
         this.signaling.on('message', (data) => {

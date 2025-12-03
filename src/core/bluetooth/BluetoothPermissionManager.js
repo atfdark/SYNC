@@ -43,10 +43,12 @@ class BluetoothPermissionManager extends EventEmitter {
      */
     async requestDeviceConnection(deviceConfig) {
         this.log.info('Requesting device connection', { deviceConfig });
+        console.log('[DEBUG] Bluetooth permission request started for device:', deviceConfig.name || deviceConfig.id);
 
         // Handle simulated devices
         if (deviceConfig.isSimulated) {
             this.log.info('Handling simulated device connection', { deviceId: deviceConfig.id });
+            console.log('[DEBUG] Using simulated device (demo mode):', deviceConfig.id);
             return this._handleSimulatedDevice(deviceConfig);
         }
 
@@ -78,32 +80,34 @@ class BluetoothPermissionManager extends EventEmitter {
             requestState.status = 'completed';
             requestState.device = device;
             
-            this.log.info('Device connection successful', { 
-                requestId, 
-                deviceId: device.id 
+            this.log.info('Device connection successful', {
+                requestId,
+                deviceId: device.id
             });
-            
-            this.emit('requestCompleted', { 
-                requestId, 
-                device, 
-                deviceConfig 
+            console.log('[DEBUG] Bluetooth device connected successfully:', device.id);
+
+            this.emit('requestCompleted', {
+                requestId,
+                device,
+                deviceConfig
             });
-            
+
             return {
                 success: true,
                 device,
                 requestId,
                 timestamp: Date.now()
             };
-            
+
         } catch (error) {
             requestState.status = 'failed';
             requestState.error = error;
-            
-            this.log.error('Device connection failed', { 
-                requestId, 
-                error: error.message 
+
+            this.log.error('Device connection failed', {
+                requestId,
+                error: error.message
             });
+            console.error('[DEBUG] Bluetooth device connection failed:', error.message);
             
             this.emit('requestFailed', { 
                 requestId, 

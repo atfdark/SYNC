@@ -26,18 +26,21 @@ class WebSocketSignaling extends EventEmitter {
 
             this.socket.on('connect', () => {
                 this.log.info('Socket.IO connection established.');
+                console.log('[DEBUG] WebSocket signaling connected to:', this.serverUrl);
                 this.isConnected = true;
                 this.emit('open');
             });
 
             this.socket.on('disconnect', () => {
                 this.log.info('Socket.IO connection closed.');
+                console.log('[DEBUG] WebSocket signaling disconnected from:', this.serverUrl);
                 this.isConnected = false;
                 this.emit('close');
             });
 
             this.socket.on('connect_error', (error) => {
                 this.log.error('Socket.IO connection error', { error });
+                console.error('[DEBUG] WebSocket signaling connection failed:', this.serverUrl, error.message);
                 this.emit('error', error);
             });
 

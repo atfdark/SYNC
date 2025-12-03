@@ -31,7 +31,11 @@
     "format": "echo 'Code formatting handled by IDE'"
   },
   "dependencies": {
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "vercel": "^32.0.0"

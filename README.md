@@ -72,13 +72,42 @@ This system addresses the complex challenge of playing synchronized audio across
 - **HTTPS or localhost** (Web Bluetooth requirement)
 - **Modern browser** with Web Bluetooth support
 - **Bluetooth-enabled devices** (speakers, headphones, etc.)
+- **Node.js** (for WebSocket signaling server)
 
-### 2. Basic Usage
+### 2. WebSocket Signaling Server Setup
+
+The system now uses a dedicated WebSocket signaling server for cross-device WebRTC connections. This replaces the previous BroadcastChannel limitation.
+
+#### Install Dependencies
+```bash
+npm install
+```
+
+#### Start the Signaling Server
+```bash
+node server/server.js
+```
+
+The server will start on `http://localhost:3001` and provide:
+- WebSocket signaling for WebRTC connections
+- Room-based device coordination
+- Health check endpoint at `/health`
+- Room information at `/room/:roomId`
+
+#### Server Features
+- **Cross-device signaling**: Connect mobile devices from different browsers/networks
+- **Room management**: Multiple independent sync sessions
+- **Real-time communication**: Low-latency signaling for WebRTC
+- **Health monitoring**: Server status and connection statistics
+
+### 3. Basic Usage
+
+**Note**: Make sure the WebSocket signaling server is running (`node server/server.js`) before using the system.
 
 ```javascript
 import { WebBluetoothAudioSync } from './src/main.js';
 
-// Initialize the system
+// Initialize the system with WebSocket signaling
 const audioSync = new WebBluetoothAudioSync({
     syncTolerance: 1,        // 1ms tolerance
     bufferSize: 2048,        // Audio buffer size
@@ -119,10 +148,16 @@ await audioSync.startSystemAudioCapture();
 
 ## 📊 Demo Interface
 
-Open `index.html` in a supported browser to access the interactive demo:
+**Prerequisites**: Start the WebSocket signaling server first:
+```bash
+node server/server.js
+```
+
+Then open `index.html` in a supported browser to access the interactive demo:
 
 - **System Controls**: Initialize, start/stop the synchronization system
 - **Device Management**: Connect and manage Bluetooth devices
+- **Mobile Connectivity**: Connect tablets/phones as additional speakers via WebRTC
 - **System Audio Capture**: Enable dual output to play any system audio through both laptop speakers and connected devices
 - **Audio Controls**: Start/stop test playback sessions
 - **Real-time Metrics**: Monitor synchronization accuracy and latency

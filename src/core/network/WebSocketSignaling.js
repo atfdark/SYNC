@@ -5,62 +5,88 @@ class WebSocketSignaling extends EventEmitter {
     constructor(serverUrl) {
         super();
         this.serverUrl = serverUrl;
-        this.ws = null;
+        this.socket = null;
         this.log = logger.createScopedLogger('WebSocketSignaling');
         this.peerId = null;
+        this.isConnected = false;
     }
 
     connect(peerId) {
         this.peerId = peerId;
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.log.warn('WebSocket is already connected.');
+        if (this.socket && this.isConnected) {
+            this.log.warn('Socket.IO is already connected.');
             return;
         }
 
-        this.ws = new WebSocket(this.serverUrl);
+        // Import socket.io client dynamically
+        import('socket.io-client').then(({ io }) => {
+            this.socket = io(this.serverUrl, {
+                transports: ['websocket', 'polling']
+            });
 
-        this.ws.onopen = () => {
-            this.log.info('WebSocket connection established.');
-            this.emit('open');
-            // Announce presence
-            this.sendMessage({ type: 'connect', peerId: this.peerId });
-        };
+            this.socket.on('connect', () => {
+                this.log.info('Socket.IO connection established.');
+                this.isConnected = true;
+                this.emit('open');
+            });
 
-        this.ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                this.log.debug('Received message', { message });
-                this.emit('message', message);
-            } catch (error) {
-                this.log.error('Failed to parse incoming message', { data: event.data, error });
-            }
-        };
+            this.socket.on('disconnect', () => {
+                this.log.info('Socket.IO connection closed.');
+                this.isConnected = false;
+                this.emit('close');
+            });
 
-        this.ws.onerror = (error) => {
-            this.log.error('WebSocket error', { error });
+            this.socket.on('connect_error', (error) => {
+                this.log.error('Socket.IO connection error', { error });
+                this.emit('error', error);
+            });
+
+            // Handle custom signaling messages
+            this.socket.on('webrtc-offer', (data) => {
+                this.emit('message', { type: 'webrtc-offer', ...data });
+            });
+
+            this.socket.on('webrtc-answer', (data) => {
+                this.emit('message', { type: 'webrtc-answer', ...data });
+            });
+
+            this.socket.on('webrtc-ice-candidate', (data) => {
+                this.emit('message', { type: 'webrtc-ice-candidate', ...data });
+            });
+
+            this.socket.on('client-joined', (data) => {
+                this.emit('message', { type: 'client-joined', ...data });
+            });
+
+            this.socket.on('client-left', (data) => {
+                this.emit('message', { type: 'client-left', ...data });
+            });
+
+            this.socket.on('room-message', (data) => {
+                this.emit('message', { type: 'room-message', ...data });
+            });
+
+        }).catch(error => {
+            this.log.error('Failed to load socket.io-client', { error });
             this.emit('error', error);
-        };
-
-        this.ws.onclose = () => {
-            this.log.info('WebSocket connection closed.');
-            this.emit('close');
-        };
+        });
     }
 
     sendMessage(message) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            // Make sure to include peerId for routing on the other side
+        if (this.socket && this.isConnected) {
+            // Send message via Socket.IO
             const outgoingMessage = { ...message, senderId: this.peerId };
-            this.ws.send(JSON.stringify(outgoingMessage));
+            this.socket.emit(message.type, outgoingMessage);
             this.log.debug('Sent message', { message: outgoingMessage });
         } else {
-            this.log.error('WebSocket is not connected. Cannot send message.');
+            this.log.error('Socket.IO is not connected. Cannot send message.');
         }
     }
 
     close() {
-        if (this.ws) {
-            this.ws.close();
+        if (this.socket) {
+            this.socket.disconnect();
+            this.isConnected = false;
         }
     }
 }

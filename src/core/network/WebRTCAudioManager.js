@@ -1,5 +1,6 @@
 import { EventEmitter } from '../utils/EventEmitter.js';
 import { logger } from '../utils/Logger.js';
+import { WebSocketSignaling } from './WebSocketSignaling.js';
 
 /**
  * WebRTCAudioManager handles peer-to-peer audio streaming to mobile devices
@@ -8,7 +9,7 @@ import { logger } from '../utils/Logger.js';
 class WebRTCAudioManager extends EventEmitter {
     constructor(options = {}) {
         super();
-        
+
         // Configuration
         this.iceServers = options.iceServers || [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -25,6 +26,12 @@ class WebRTCAudioManager extends EventEmitter {
             autoGainControl: false,
             sampleRate: options.sampleRate || 44100
         };
+
+        // Signaling configuration
+        this.signalingServerUrl = options.signalingServerUrl || 'https://your-signaling-app.up.railway.app';
+        this.roomId = options.roomId || 'syncplay-room';
+        this.clientId = options.clientId || this._generateClientId();
+        this.signaling = null;
         
         // Connection management
         this.connections = new Map(); // peerId -> RTCPeerConnection
@@ -52,10 +59,83 @@ class WebRTCAudioManager extends EventEmitter {
         
         this.log = logger.createScopedLogger('WebRTCAudioManager');
 
+        // Initialize signaling
+        this._initializeSignaling();
+
         // Initialize audio context asynchronously
         this._initializeAudioContext().catch(error => {
             this.log.error('Failed to initialize WebRTC AudioContext in constructor', { error: error.message });
         });
+    }
+
+    /**
+     * Initialize WebSocket signaling
+     * @private
+     */
+    _initializeSignaling() {
+        this.signaling = new WebSocketSignaling(this.signalingServerUrl);
+
+        this.signaling.on('open', () => {
+            this.log.info('Signaling connection established');
+            // Register with the signaling server
+            this.signaling.sendMessage({
+                type: 'register',
+                clientType: 'laptop', // or 'mobile' depending on context
+                clientId: this.clientId,
+                roomId: this.roomId
+            });
+        });
+
+        this.signaling.on('message', (message) => {
+            this._handleSignalingMessage(message);
+        });
+
+        this.signaling.on('error', (error) => {
+            this.log.error('Signaling error', { error });
+        });
+
+        this.signaling.on('close', () => {
+            this.log.warn('Signaling connection closed');
+        });
+
+        // Connect to signaling server
+        this.signaling.connect(this.clientId);
+    }
+
+    /**
+     * Handle incoming signaling messages
+     * @param {object} message - Signaling message
+     * @private
+     */
+    _handleSignalingMessage(message) {
+        switch (message.type) {
+            case 'webrtc-offer':
+                this._handleIncomingOffer(message);
+                break;
+            case 'webrtc-answer':
+                this._handleIncomingAnswer(message);
+                break;
+            case 'webrtc-ice-candidate':
+                this._handleIncomingIceCandidate(message);
+                break;
+            case 'client-joined':
+                this.emit('clientJoined', message);
+                break;
+            case 'client-left':
+                this.emit('clientLeft', message);
+                break;
+            default:
+                this.log.debug('Unknown signaling message', { message });
+        }
+    }
+
+    /**
+     * Generate a unique client ID
+     * @returns {string} Client ID
+     * @private
+     */
+    _generateClientId() {
+        return 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     /**
@@ -177,7 +257,13 @@ class WebRTCAudioManager extends EventEmitter {
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
                     console.log('[DEBUG] Generated ICE candidate for offer:', { peerId, type: event.candidate.type });
-                    this.emit('iceCandidate', { peerId, candidate: event.candidate });
+                    // Send ICE candidate via signaling
+                    this.signaling.sendMessage({
+                        type: 'webrtc-ice-candidate',
+                        targetId: peerId,
+                        candidate: event.candidate,
+                        roomId: this.roomId
+                    });
                 }
             };
 
@@ -405,6 +491,165 @@ class WebRTCAudioManager extends EventEmitter {
         this.emit('remoteStreamReceived', { peerId, stream, audioElement });
         
         this.log.info('Remote audio stream received', { peerId });
+    }
+
+    /**
+     * Handle incoming WebRTC offer
+     * @param {object} message - Signaling message
+     * @private
+     */
+    async _handleIncomingOffer(message) {
+        const { fromId, offer } = message;
+        this.log.info('Received WebRTC offer', { fromId });
+
+        try {
+            // Create answer automatically
+            const answerData = await this.createConnectionAnswer(fromId, offer);
+            // Send answer via signaling
+            this.signaling.sendMessage({
+                type: 'webrtc-answer',
+                targetId: fromId,
+                answer: answerData.answer,
+                roomId: this.roomId
+            });
+        } catch (error) {
+            this.log.error('Failed to handle incoming offer', { fromId, error: error.message });
+        }
+    }
+
+    /**
+     * Handle incoming WebRTC answer
+     * @param {object} message - Signaling message
+     * @private
+     */
+    async _handleIncomingAnswer(message) {
+        const { fromId, answer } = message;
+        this.log.info('Received WebRTC answer', { fromId });
+
+        try {
+            await this.acceptConnectionAnswer(fromId, answer);
+        } catch (error) {
+            this.log.error('Failed to handle incoming answer', { fromId, error: error.message });
+        }
+    }
+
+    /**
+     * Handle incoming ICE candidate
+     * @param {object} message - Signaling message
+     * @private
+     */
+    async _handleIncomingIceCandidate(message) {
+        const { fromId, candidate } = message;
+        this.log.debug('Received ICE candidate', { fromId });
+
+        try {
+            await this.addIceCandidate(fromId, candidate);
+        } catch (error) {
+            this.log.error('Failed to handle incoming ICE candidate', { fromId, error: error.message });
+        }
+    }
+
+    /**
+     * Create a connection answer for an incoming offer
+     * @param {string} peerId - Peer identifier
+     * @param {object} offer - Connection offer data
+     * @returns {Promise<object>} Connection answer data
+     */
+    async createConnectionAnswer(peerId, offer) {
+        if (!this.isSupported()) {
+            throw new Error('WebRTC not supported in this browser');
+        }
+
+        try {
+            this.log.info('Creating connection answer', { peerId });
+
+            // Create peer connection
+            const peerConnection = new RTCPeerConnection({
+                iceServers: this.iceServers,
+                iceCandidatePoolSize: 10,
+                bundlePolicy: 'max-bundle',
+                rtcpMuxPolicy: 'require'
+            });
+
+            this.connections.set(peerId, peerConnection);
+            this.pendingConnections.add(peerId);
+
+            // Set up connection event handlers
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Send ICE candidate via signaling
+                    this.signaling.sendMessage({
+                        type: 'webrtc-ice-candidate',
+                        targetId: peerId,
+                        candidate: event.candidate,
+                        roomId: this.roomId
+                    });
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                this._handleConnectionStateChange(peerId, peerConnection.connectionState);
+            };
+
+            peerConnection.ontrack = (event) => {
+                this._handleRemoteStream(peerId, event.streams[0]);
+            };
+
+            // Create data channel for control messages
+            const dataChannel = peerConnection.createDataChannel('audioControl', {
+                ordered: true
+            });
+
+            dataChannel.onopen = () => {
+                this.log.info('Data channel opened', { peerId });
+                this.dataChannels.set(peerId, dataChannel);
+            };
+
+            dataChannel.onmessage = (event) => {
+                this._handleDataChannelMessage(peerId, event.data);
+            };
+
+            dataChannel.onerror = (error) => {
+                this.log.error('Data channel error', { peerId, error: error.message });
+            };
+
+            // Set remote description
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+            // Create answer
+            const answer = await peerConnection.createAnswer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: false,
+                voiceActivityDetection: false
+            });
+
+            await peerConnection.setLocalDescription(answer);
+
+            // Update statistics
+            this.connectionStats.totalConnections++;
+
+            this.log.info('Connection answer created', {
+                peerId,
+                answerType: answer.type
+            });
+
+            return {
+                peerId,
+                answer: {
+                    type: answer.type,
+                    sdp: answer.sdp
+                },
+                timestamp: Date.now()
+            };
+
+        } catch (error) {
+            this.log.error('Failed to create connection answer', {
+                peerId,
+                error: error.message
+            });
+            this._cleanupFailedConnection(peerId);
+            throw error;
+        }
     }
 
     /**
@@ -638,11 +883,16 @@ class WebRTCAudioManager extends EventEmitter {
     cleanup() {
         this.stopAudioStreaming();
         this.disconnectAllPeers();
-        
+
+        // Close signaling connection
+        if (this.signaling) {
+            this.signaling.close();
+        }
+
         if (this.audioContext && this.audioContext.state !== 'closed') {
             this.audioContext.close();
         }
-        
+
         this.emit('cleanup');
         this.log.info('WebRTC Audio Manager cleaned up');
     }

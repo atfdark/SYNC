@@ -971,8 +971,6 @@
                     connectionURL: document.getElementById('connectionURL')
                 };
 
-                // Mobile broadcast channel
-                this.mobileBroadcastChannel = null;
 
                 this._setupEventListeners();
                 this._setupDragAndDrop();
@@ -1104,13 +1102,11 @@
                 // Mobile Connectivity events
                 this.audioSyncSystem.on('mobileOutputEnabled', () => {
                     this._updateMobileOutputUI(true);
-                    this._setupMobileBroadcastChannel();
                     this.log('Mobile output mode enabled');
                 });
 
                 this.audioSyncSystem.on('mobileOutputDisabled', () => {
                     this._updateMobileOutputUI(false);
-                    this._cleanupMobileBroadcastChannel();
                     this.log('Mobile output mode disabled');
                 });
 
@@ -1730,105 +1726,6 @@
                 }
             }
 
-            _setupMobileBroadcastChannel() {
-                if (typeof BroadcastChannel !== 'undefined') {
-                    this.mobileBroadcastChannel = new BroadcastChannel('syncplay-mobile');
-                    this.mobileBroadcastChannel.onmessage = (event) => {
-                        this._handleMobileBroadcastMessage(event.data);
-                    };
-                    this.log('Mobile broadcast channel set up');
-                } else {
-                    this.log('BroadcastChannel not supported');
-                }
-            }
-
-            _cleanupMobileBroadcastChannel() {
-                if (this.mobileBroadcastChannel) {
-                    this.mobileBroadcastChannel.close();
-                    this.mobileBroadcastChannel = null;
-                    this.log('Mobile broadcast channel cleaned up');
-                }
-            }
-
-            async _handleMobileBroadcastMessage(data) {
-                this.log('Received mobile broadcast message', data);
-
-                try {
-                    switch (data.type) {
-                        case 'mobile-ready':
-                            await this._handleMobileDeviceReady(data.peerId);
-                            break;
-                        case 'webrtc-answer':
-                            await this._handleWebRTCAnswer(data);
-                            break;
-                        case 'webrtc-answer-candidate':
-                            await this._handleWebRTCAnswerCandidate(data);
-                            break;
-                        default:
-                            this.log('Unknown mobile broadcast message type', data.type);
-                    }
-                } catch (error) {
-                    this.log('Error handling mobile broadcast message', { error: error.message, data });
-                }
-            }
-
-            async _handleMobileDeviceReady(peerId) {
-                this.log(`Mobile device ready: ${peerId}`);
-    
-                try {
-                    // Create connection offer for the mobile device
-                    const offerData = await this.audioSyncSystem.createMobileConnectionOffer(peerId);
-    
-                    // Send offer via broadcast channel
-                    if (this.mobileBroadcastChannel) {
-                        this.mobileBroadcastChannel.postMessage({
-                            type: 'webrtc-offer',
-                            peerId: peerId,
-                            offer: offerData.offer
-                        });
-                        this.log(`Sent WebRTC offer to mobile device: ${peerId}`);
-                    } else {
-                        this.log('Mobile broadcast channel not available when trying to send offer');
-                    }
-                } catch (error) {
-                    this.log(`Failed to create offer for mobile device ${peerId}: ${error.message}`);
-                    console.error(`Failed to create offer for mobile device ${peerId}`, { error });
-                }
-            }
-
-            async _handleWebRTCAnswer(data) {
-                const { peerId, answer } = data;
-                this.log(`Received WebRTC answer from ${peerId}`);
-    
-                try {
-                    await this.audioSyncSystem.acceptMobileConnectionAnswer(peerId, answer);
-                    this.log(`WebRTC connection established with ${peerId}`);
-    
-                    // Notify mobile device that connection is accepted
-                    if (this.mobileBroadcastChannel) {
-                        this.mobileBroadcastChannel.postMessage({
-                            type: 'webrtc-answer-accepted',
-                            peerId: peerId
-                        });
-                    } else {
-                        this.log('Mobile broadcast channel not available when trying to send answer-accepted notification');
-                    }
-                } catch (error) {
-                    this.log(`Failed to accept WebRTC answer from ${peerId}: ${error.message}`);
-                    console.error(`Failed to accept WebRTC answer from ${peerId}`, { error });
-                }
-            }
-
-            async _handleWebRTCAnswerCandidate(data) {
-                const { peerId, candidate } = data;
-                this.log.debug(`Received ICE candidate from ${peerId}`);
-
-                try {
-                    await this.audioSyncSystem.addMobileIceCandidate(peerId, candidate);
-                } catch (error) {
-                    this.log.error(`Failed to add ICE candidate from ${peerId}`, { error: error.message });
-                }
-            }
 
             _showMobileConnectionInfo() {
                 // Generate connection URL
@@ -1852,14 +1749,14 @@
                     if (this.audioSyncSystem.isWebRTCSupported()) {
                         this._showMobileConnectionInfo();
     
-                        // Add or show explanatory note about BroadcastChannel limitations
+                        // Add or show explanatory note about WebSocket signaling
                         if (!noteEl) {
                             noteEl = document.createElement('div');
                             noteEl.id = 'mobileConnectionNote';
                             noteEl.className = 'system-audio-info';
                             noteEl.innerHTML = `
-                                <p>Note: Current version uses browser BroadcastChannel for signaling. Connection will only work when this page and the mobile speaker page are opened in the same browser on the same device.</p>
-                                <p>For real phone/tablet connections across different devices or networks, a small signaling server will be required.</p>
+                                <p>Mobile devices can now connect across different browsers and devices using WebSocket signaling.</p>
+                                <p>Make sure the signaling server is running on port 3001.</p>
                             `;
                             section.appendChild(noteEl);
                         } else {
@@ -1931,18 +1828,6 @@
                 }
             }
 
-            _sendIceCandidateToMobile(peerId, candidate) {
-                if (this.mobileBroadcastChannel) {
-                    this.mobileBroadcastChannel.postMessage({
-                        type: 'webrtc-offer-candidate',
-                        peerId: peerId,
-                        candidate: candidate
-                    });
-                    this.log.debug(`Sent ICE candidate to mobile device: ${peerId}`);
-                } else {
-                    this.log.error('Mobile broadcast channel not available for sending ICE candidate');
-                }
-            }
 
             log(message) {
                 const timestamp = new Date().toLocaleTimeString();

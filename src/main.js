@@ -73,7 +73,10 @@ class WebBluetoothAudioSync extends EventEmitter {
         
         // WebRTC audio streaming for mobile device connectivity
         this.webrtcManager = new WebRTCAudioManager({
-            sampleRate: this.config.sampleRate
+            sampleRate: this.config.sampleRate,
+            signalingServerUrl: 'http://localhost:3001', // Socket.io server URL
+            roomId: 'syncplay-room',
+            clientId: this.masterPeerId
         });
         
         // Device tracking
@@ -85,8 +88,6 @@ class WebBluetoothAudioSync extends EventEmitter {
 
         this.masterPeerId = `sync-master-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // WebSocket signaling
-        this.signaling = null;
 
         // Dual output configuration
         this.dualOutputMode = false;
@@ -129,7 +130,6 @@ class WebBluetoothAudioSync extends EventEmitter {
             
             // Set up event handlers
             this._setupEventHandlers();
-            this._setupSignaling();
             
             // Start core components
             await this._startCoreComponents();
@@ -1045,12 +1045,6 @@ class WebBluetoothAudioSync extends EventEmitter {
 
         // WebRTC Manager events
         this.webrtcManager.on('iceCandidate', (event) => {
-            const { peerId, candidate } = event;
-            this.signaling.sendMessage({
-                type: 'webrtc-offer-candidate',
-                targetPeerId: peerId,
-                candidate: candidate
-            });
             this.emit('iceCandidate', event);
         });
 
@@ -1080,159 +1074,6 @@ class WebBluetoothAudioSync extends EventEmitter {
         });
     }
 
-    /**
-     * Set up WebSocket signaling
-     * @private
-     */
-    _setupSignaling() {
-        const SIGNALING_SERVER_URL = 'wss://socketsbay.com/wss/v2/1/demo/';
-        this.signaling = new WebSocketSignaling(SIGNALING_SERVER_URL);
-        this.signaling.connect(this.masterPeerId);
-
-        this.signaling.on('message', (data) => {
-            this._handleSignalingMessage(data);
-        });
-
-        this.log.info('WebSocket signaling initialized', { masterPeerId: this.masterPeerId });
-    }
-
-    /**
-     * Handle messages from the signaling server
-     * @param {object} data - Message data
-     * @private
-     */
-    async _handleSignalingMessage(data) {
-        this.log.info('Received signaling message', { type: data.type, senderId: data.senderId });
-
-        // Don't process messages from self
-        if (data.senderId === this.masterPeerId) {
-            return;
-        }
-
-        try {
-            if (!data || typeof data !== 'object' || !data.type) {
-                throw new Error('Invalid message format');
-            }
-
-            const peerId = data.senderId; // The mobile device is the sender
-
-            switch (data.type) {
-                case 'mobile-ready':
-                    await this._handleMobileReady({ ...data, peerId });
-                    break;
-                case 'webrtc-answer':
-                    await this._handleWebRTCAnswer({ ...data, peerId });
-                    break;
-                case 'webrtc-answer-candidate':
-                    await this._handleWebRTCAnswerCandidate({ ...data, peerId });
-                    break;
-                default:
-                    this.log.warn('Unknown signaling message type', { type: data.type });
-            }
-        } catch (error) {
-            this.log.error('Failed to handle signaling message', {
-                error: error.message,
-                data: JSON.stringify(data)
-            });
-        }
-    }
-
-    /**
-     * Handle mobile device ready message
-     * @param {object} data - Mobile ready data
-     * @private
-     */
-    async _handleMobileReady(data) {
-        const { peerId } = data;
-
-        this.log.debug('Mobile ready message received', { peerId, mobileOutputMode: this.mobileOutputMode, data });
-
-        if (!this.mobileOutputMode) {
-            this.log.warn('Mobile ready received but mobile output mode not enabled', { peerId });
-            return;
-        }
-
-        this.log.info('Mobile device ready, creating connection offer', { peerId });
-
-        try {
-            // Create WebRTC offer for the mobile peer
-            this.log.debug('Calling createMobileConnectionOffer', { peerId });
-            const offerData = await this.createMobileConnectionOffer(peerId);
-            this.log.debug('WebRTC offer created successfully', { peerId, offerType: offerData.offer.type });
-
-            // Send offer via WebSocket
-            this.signaling.sendMessage({
-                type: 'webrtc-offer',
-                targetPeerId: peerId,
-                offer: offerData.offer
-            });
-
-            this.log.info('WebRTC offer sent to mobile peer', { peerId });
-
-        } catch (error) {
-            this.log.error('Failed to create and send offer to mobile peer', {
-                peerId,
-                error: error.message,
-                stack: error.stack
-            });
-        }
-    }
-
-    /**
-     * Handle WebRTC answer from mobile peer
-     * @param {object} data - Answer data
-     * @private
-     */
-    async _handleWebRTCAnswer(data) {
-        const { peerId, answer } = data;
-
-        this.log.debug('WebRTC answer received from mobile peer', { peerId, answerType: answer?.type });
-        this.log.info('Received WebRTC answer from mobile peer', { peerId });
-
-        try {
-            this.log.debug('Calling acceptMobileConnectionAnswer', { peerId });
-            await this.acceptMobileConnectionAnswer(peerId, answer);
-            this.log.debug('WebRTC answer accepted successfully', { peerId });
-
-            // Notify mobile that answer was accepted
-            this.signaling.sendMessage({
-                type: 'webrtc-answer-accepted',
-                targetPeerId: peerId
-            });
-            this.log.debug('Sent webrtc-answer-accepted message to peer', { peerId });
-
-        } catch (error) {
-            this.log.error('Failed to accept WebRTC answer', {
-                peerId,
-                error: error.message,
-                stack: error.stack
-            });
-        }
-    }
-
-    /**
-     * Handle ICE candidate from mobile peer
-     * @param {object} data - ICE candidate data
-     * @private
-     */
-    async _handleWebRTCAnswerCandidate(data) {
-        const { peerId, candidate } = data;
-
-        this.log.debug('ICE candidate received from mobile peer', { peerId, candidateType: candidate?.type, candidateSnippet: candidate?.candidate?.substring(0, 50) + '...' });
-        this.log.debug('Received ICE candidate from mobile peer', { peerId });
-
-        try {
-            this.log.debug('Calling addMobileIceCandidate', { peerId });
-            await this.addMobileIceCandidate(peerId, candidate);
-            this.log.debug('ICE candidate added successfully', { peerId });
-        } catch (error) {
-            this.log.error('Failed to add ICE candidate from mobile peer', {
-                peerId,
-                error: error.message,
-                stack: error.stack
-            });
-        }
-    }
 
 
     /**

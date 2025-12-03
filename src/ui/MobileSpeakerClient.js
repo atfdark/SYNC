@@ -54,7 +54,7 @@ class MobileSpeakerClient {
     }
 
     _setupSignaling() {
-        const SIGNALING_SERVER_URL = 'wss://socketsbay.com/wss/v2/1/demo/';
+        const SIGNALING_SERVER_URL = 'https://your-signaling-app.up.railway.app'; // Socket.io server URL
         this.signaling = new WebSocketSignaling(SIGNALING_SERVER_URL);
 
         this.signaling.on('message', (data) => {
@@ -63,12 +63,26 @@ class MobileSpeakerClient {
 
         this.signaling.on('open', () => {
             this.log.info('Signaling connection opened.');
+            // Register as mobile client
+            this.signaling.sendMessage({
+                type: 'register',
+                clientType: 'mobile',
+                clientId: this.deviceId,
+                roomId: 'syncplay-room'
+            });
         });
 
         this.signaling.on('close', () => {
             this.log.warn('Signaling connection closed.');
             this._updateConnectionStatus('Signaling disconnected', true);
         });
+
+        this.signaling.on('error', (error) => {
+            this.log.error('Signaling connection error', { error });
+        });
+
+        // Connect to signaling server
+        this.signaling.connect(this.deviceId);
     }
 
     _setupEventListeners() {
@@ -82,7 +96,7 @@ class MobileSpeakerClient {
         this.log.log('Received signaling message', data);
 
         // Don't process messages from self
-        if (data.senderId === this.deviceId) {
+        if (data.fromId === this.deviceId) {
             return;
         }
 
@@ -90,7 +104,7 @@ class MobileSpeakerClient {
             case 'webrtc-offer':
                 this._handleConnectionOffer(data);
                 break;
-            case 'webrtc-offer-candidate':
+            case 'webrtc-ice-candidate':
                 this._handleOfferIceCandidate(data);
                 break;
             case 'webrtc-answer-accepted':
@@ -117,16 +131,11 @@ class MobileSpeakerClient {
                 throw new Error('WebRTC not supported in this browser');
             }
 
-            // Connect to signaling server and wait for open event
-            this.signaling.on('open', () => {
-                this.log.log('Signaling channel open. Announcing mobile device ready.');
-                // Announce mobile device ready via WebSocket
-                this.signaling.sendMessage({
-                    type: 'mobile-ready',
-                    timestamp: Date.now()
-                });
+            // Announce mobile device ready via Socket.io
+            this.signaling.sendMessage({
+                type: 'mobile-ready',
+                timestamp: Date.now()
             });
-            this.signaling.connect(this.deviceId);
 
             // Create peer connection
             console.log('[DEBUG] Creating RTCPeerConnection');
@@ -142,8 +151,10 @@ class MobileSpeakerClient {
                 if (event.candidate) {
                     console.log('[DEBUG] Generated ICE candidate:', { type: event.candidate.type, candidate: event.candidate.candidate?.substring(0, 50) + '...' });
                     this.signaling.sendMessage({
-                        type: 'webrtc-answer-candidate',
-                        candidate: event.candidate
+                        type: 'webrtc-ice-candidate',
+                        targetId: 'laptop', // Send to laptop (offerer)
+                        candidate: event.candidate,
+                        roomId: 'syncplay-room'
                     });
                 }
             };
@@ -217,10 +228,12 @@ class MobileSpeakerClient {
             // Send answer back to laptop
             const answerMessage = {
                 type: 'webrtc-answer',
+                targetId: 'laptop', // Send to laptop (offerer)
                 answer: {
                     type: answer.type,
                     sdp: answer.sdp
-                }
+                },
+                roomId: 'syncplay-room'
             };
             this.signaling.sendMessage(answerMessage);
             console.log('[DEBUG] Sent webrtc-answer message');

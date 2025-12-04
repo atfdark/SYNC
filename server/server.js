@@ -102,6 +102,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle mobile-ready message
+  socket.on('mobile-ready', (data) => {
+    const client = connectedClients.get(socket.id);
+    if (client) {
+      console.log(`Mobile client ready: ${client.clientId} in room ${client.roomId}`);
+      // Broadcast to laptop clients in the same room
+      socket.to(client.roomId).emit('mobile-ready', {
+        fromId: client.clientId,
+        roomId: client.roomId,
+        timestamp: data.timestamp
+      });
+    }
+  });
+
   // Handle room messages (broadcast to room)
   socket.on('room-message', (data) => {
     const { roomId, message } = data;

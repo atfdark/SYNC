@@ -313,19 +313,33 @@ class MobileSpeakerClient {
 
     _handleConnectionStateChange() {
         const state = this.peerConnection.connectionState;
-        
+        const iceState = this.peerConnection.iceConnectionState;
+        const iceGatheringState = this.peerConnection.iceGatheringState;
+
+        this.log.log('Connection state changed', { state, iceState, iceGatheringState });
+
         switch (state) {
             case 'connected':
                 this._setConnectedState(true);
+                this._updateConnectionStatus('Connected successfully', false);
+                break;
+            case 'connecting':
+                this._updateConnectionStatus('Establishing connection...', false);
                 break;
             case 'disconnected':
+                this._setConnectedState(false);
+                this._updateConnectionStatus(`Connection lost (ICE: ${iceState})`, true);
+                break;
             case 'failed':
                 this._setConnectedState(false);
-                this._updateConnectionStatus('Connection lost', true);
+                this._updateConnectionStatus(`Connection failed (ICE: ${iceState}, Gathering: ${iceGatheringState})`, true);
                 break;
             case 'closed':
                 this._setConnectedState(false);
+                this._updateConnectionStatus('Connection closed', true);
                 break;
+            default:
+                this._updateConnectionStatus(`Connection state: ${state}`, false);
         }
     }
 

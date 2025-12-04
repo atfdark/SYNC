@@ -12,12 +12,28 @@ class WebRTCAudioManager extends EventEmitter {
 
         // Configuration
         this.iceServers = options.iceServers || [
+            // Multiple STUN servers for better connectivity
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            // TURN servers for NAT traversal
             {
                 urls: 'turn:openrelay.metered.ca:80',
                 username: 'openrelayproject',
                 credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            // Alternative TURN server
+            {
+                urls: 'turn:turn.bistri.com:80',
+                username: 'homeo',
+                credential: 'homeo'
             }
         ];
         this.audioConstraints = {
@@ -28,7 +44,7 @@ class WebRTCAudioManager extends EventEmitter {
         };
 
         // Signaling configuration
-        this.signalingServerUrl = options.signalingServerUrl || 'https://your-signaling-app.up.railway.app';
+        this.signalingServerUrl = options.signalingServerUrl || `${window.location.protocol}//${window.location.host}`;
         this.roomId = options.roomId || 'syncplay-room';
         this.clientId = options.clientId || this._generateClientId();
         this.signaling = null;
@@ -117,6 +133,9 @@ class WebRTCAudioManager extends EventEmitter {
                 break;
             case 'webrtc-ice-candidate':
                 this._handleIncomingIceCandidate(message);
+                break;
+            case 'mobile-ready':
+                this._handleMobileReady(message);
                 break;
             case 'client-joined':
                 this.emit('clientJoined', message);
@@ -297,17 +316,32 @@ class WebRTCAudioManager extends EventEmitter {
                 this.log.error('Data channel error', { peerId, error: error.message });
             };
 
-            // Set up ICE gathering timeout
+            // Set up ICE gathering with retry logic
             let iceGatheringResolve;
-            const iceGatheringPromise = new Promise(resolve => {
+            let iceRetryCount = 0;
+            const maxIceRetries = 3;
+
+            const attemptIceGathering = () => new Promise(async (resolve, reject) => {
                 iceGatheringResolve = resolve;
+                const timeout = setTimeout(() => {
+                    if (iceRetryCount < maxIceRetries) {
+                        iceRetryCount++;
+                        this.log.warn(`ICE gathering timeout, retrying (${iceRetryCount}/${maxIceRetries})`);
+                        clearTimeout(timeout);
+                        attemptIceGathering().then(resolve).catch(reject);
+                    } else {
+                        reject(new Error(`ICE gathering failed after ${maxIceRetries} retries`));
+                    }
+                }, 10000 + (iceRetryCount * 5000)); // Increasing timeout
+
+                peerConnection.onicegatheringstatechange = () => {
+                    console.log('[DEBUG] ICE gathering state changed to:', peerConnection.iceGatheringState);
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        clearTimeout(timeout);
+                        resolve();
+                    }
+                };
             });
-            peerConnection.onicegatheringstatechange = () => {
-                console.log('[DEBUG] ICE gathering state changed to:', peerConnection.iceGatheringState);
-                if (peerConnection.iceGatheringState === 'complete') {
-                    iceGatheringResolve();
-                }
-            };
 
             // Create offer
             console.log('[DEBUG] Creating WebRTC offer');
@@ -320,13 +354,10 @@ class WebRTCAudioManager extends EventEmitter {
             console.log('[DEBUG] Setting local description');
             await peerConnection.setLocalDescription(offer);
 
-            // Wait for ICE gathering to complete or timeout
+            // Wait for ICE gathering to complete with retries
             console.log('[DEBUG] Waiting for ICE gathering to complete');
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('ICE gathering timeout after 15 seconds')), 15000);
-            });
-            await Promise.race([iceGatheringPromise, timeoutPromise]);
-            console.log('[DEBUG] ICE gathering completed');
+            await attemptIceGathering();
+            console.log('[DEBUG] ICE gathering completed successfully');
 
             // Update statistics
             this.connectionStats.totalConnections++;
@@ -445,6 +476,10 @@ class WebRTCAudioManager extends EventEmitter {
         console.log('[DEBUG] WebRTC connection state changed:', { peerId, state });
         this.log.debug('Connection state changed', { peerId, state });
 
+        const peerConnection = this.connections.get(peerId);
+        const iceConnectionState = peerConnection?.iceConnectionState;
+        const iceGatheringState = peerConnection?.iceGatheringState;
+
         switch (state) {
             case 'connected':
                 console.log('[DEBUG] WebRTC peer connected successfully:', peerId);
@@ -456,11 +491,26 @@ class WebRTCAudioManager extends EventEmitter {
             case 'disconnected':
                 console.log('[DEBUG] WebRTC peer disconnected:', peerId);
                 this._handlePeerDisconnection(peerId);
+                this.emit('connectionError', {
+                    peerId,
+                    error: 'Peer disconnected',
+                    state,
+                    iceConnectionState,
+                    iceGatheringState
+                });
                 break;
 
             case 'failed':
                 console.error('[DEBUG] WebRTC connection failed:', peerId);
                 this._handlePeerDisconnection(peerId);
+                this.emit('connectionError', {
+                    peerId,
+                    error: 'Connection failed',
+                    state,
+                    iceConnectionState,
+                    iceGatheringState,
+                    reason: 'ICE connection failed or timed out'
+                });
                 break;
 
             case 'closed':
@@ -491,6 +541,30 @@ class WebRTCAudioManager extends EventEmitter {
         this.emit('remoteStreamReceived', { peerId, stream, audioElement });
         
         this.log.info('Remote audio stream received', { peerId });
+    }
+
+    /**
+     * Handle mobile-ready message to initiate offer creation
+     * @param {object} message - Signaling message
+     * @private
+     */
+    async _handleMobileReady(message) {
+        const mobileClientId = message.fromId || message.senderId;
+        this.log.info('Mobile client ready, creating connection offer', { mobileClientId });
+
+        try {
+            const offerData = await this.createConnectionOffer(mobileClientId);
+            // Send offer via signaling
+            this.signaling.sendMessage({
+                type: 'webrtc-offer',
+                targetId: mobileClientId,
+                offer: offerData.offer,
+                roomId: this.roomId
+            });
+            this.log.info('Offer sent to mobile client', { mobileClientId });
+        } catch (error) {
+            this.log.error('Failed to create offer for mobile client', { mobileClientId, error: error.message });
+        }
     }
 
     /**
@@ -875,6 +949,77 @@ class WebRTCAudioManager extends EventEmitter {
      */
     isPeerConnected(peerId) {
         return this.connectedPeers.has(peerId);
+    }
+
+    /**
+     * Perform health check on connections
+     * @returns {object} Health status
+     */
+    performHealthCheck() {
+        const health = {
+            timestamp: Date.now(),
+            signalingConnected: this.signaling?.isConnected || false,
+            totalPeers: this.connections.size,
+            connectedPeers: this.connectedPeers.size,
+            pendingConnections: this.pendingConnections.size,
+            connectionStats: this.connectionStats,
+            peerHealth: {}
+        };
+
+        for (const [peerId, peerConnection] of this.connections) {
+            const state = peerConnection.connectionState;
+            const iceState = peerConnection.iceConnectionState;
+            const dataChannel = this.dataChannels.get(peerId);
+
+            health.peerHealth[peerId] = {
+                connectionState: state,
+                iceConnectionState: iceState,
+                dataChannelState: dataChannel?.readyState || 'none',
+                isConnected: this.connectedPeers.has(peerId),
+                lastActivity: Date.now() // Could track actual activity
+            };
+
+            // Emit health warnings
+            if (state === 'failed' || iceState === 'failed') {
+                this.emit('healthWarning', {
+                    peerId,
+                    issue: 'Connection failed',
+                    state,
+                    iceState
+                });
+            } else if (state === 'disconnected') {
+                this.emit('healthWarning', {
+                    peerId,
+                    issue: 'Peer disconnected',
+                    state
+                });
+            }
+        }
+
+        this.log.debug('Health check performed', health);
+        return health;
+    }
+
+    /**
+     * Start periodic health monitoring
+     * @param {number} interval - Check interval in milliseconds
+     */
+    startHealthMonitoring(interval = 30000) {
+        this.healthCheckInterval = setInterval(() => {
+            this.performHealthCheck();
+        }, interval);
+        this.log.info('Health monitoring started', { interval });
+    }
+
+    /**
+     * Stop health monitoring
+     */
+    stopHealthMonitoring() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+            this.log.info('Health monitoring stopped');
+        }
     }
 
     /**

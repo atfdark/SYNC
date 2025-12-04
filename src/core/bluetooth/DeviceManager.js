@@ -314,6 +314,10 @@ class DeviceManager extends EventEmitter {
      * a device to trigger the permission dialog, then falls back to simulated devices
      * for demo purposes if no real device is selected or Web Bluetooth is unavailable.
      *
+     * Note: Web Bluetooth API does not support passive scanning. All device discovery
+     * requires explicit user interaction through the browser's device selection dialog.
+     * This is a fundamental limitation of the Web Bluetooth specification.
+     *
      * @param {object} scanOptions - Scan options
      * @returns {Promise<Array>} Array of available devices
      */
@@ -344,37 +348,45 @@ class DeviceManager extends EventEmitter {
             return realDevices;
 
         } catch (error) {
-            console.log('[DEBUG] Bluetooth scan failed or cancelled, falling back to demo mode:', error.message);
+            console.log('[DEBUG] Bluetooth scan failed or cancelled, falling back to simulated demo mode:', error.message);
+            this.log.warn('Real Bluetooth scan failed, using simulated devices for demo purposes', { error: error.message });
 
-            // Fall back to simulated devices for demo
+            // Fall back to simulated devices for demo - clearly distinguish from real failures
             const simulatedDevices = [
                 {
                     id: 'sim_device_1',
-                    name: 'Bluetooth Speaker 1',
+                    name: 'Bluetooth Speaker 1 (Demo)',
                     type: 'audio_output',
                     signalStrength: -45,
                     battery: 85,
-                    isSimulated: true
+                    isSimulated: true,
+                    isDemoMode: true
                 },
                 {
                     id: 'sim_device_2',
-                    name: 'Bluetooth Speaker 2',
+                    name: 'Bluetooth Speaker 2 (Demo)',
                     type: 'audio_output',
                     signalStrength: -52,
                     battery: 67,
-                    isSimulated: true
+                    isSimulated: true,
+                    isDemoMode: true
                 },
                 {
                     id: 'sim_device_3',
-                    name: 'Wireless Headphones',
+                    name: 'Wireless Headphones (Demo)',
                     type: 'audio_output',
                     signalStrength: -38,
                     battery: 92,
-                    isSimulated: true
+                    isSimulated: true,
+                    isDemoMode: true
                 }
             ];
 
-            this.emit('deviceScanCompleted', { devices: simulatedDevices });
+            this.emit('deviceScanCompleted', {
+                devices: simulatedDevices,
+                isDemoMode: true,
+                reason: 'Real Bluetooth scan failed - using demo devices'
+            });
             return simulatedDevices;
         }
     }

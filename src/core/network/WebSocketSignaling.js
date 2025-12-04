@@ -57,6 +57,10 @@ class WebSocketSignaling extends EventEmitter {
                 this.emit('message', { type: 'webrtc-ice-candidate', ...data });
             });
 
+            this.socket.on('mobile-ready', (data) => {
+                this.emit('message', { type: 'mobile-ready', ...data });
+            });
+
             this.socket.on('client-joined', (data) => {
                 this.emit('message', { type: 'client-joined', ...data });
             });

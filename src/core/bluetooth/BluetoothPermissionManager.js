@@ -227,7 +227,20 @@ class BluetoothPermissionManager extends EventEmitter {
         }
         
         if (error.name === 'NotSupportedError') {
-            return 'This browser or device does not support Web Bluetooth. Please use Chrome, Edge, or Safari on a secure (HTTPS) connection.';
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isChromiumBased = userAgent.includes('chrome') || userAgent.includes('chromium') || userAgent.includes('edg');
+            const isFirefox = userAgent.includes('firefox');
+            const isSafari = userAgent.includes('safari') && !userAgent.includes('chrome');
+
+            if (isFirefox) {
+                return 'Firefox has limited Web Bluetooth support. Please use Chrome, Edge, or a Chromium-based browser for full compatibility.';
+            } else if (isSafari) {
+                return 'Safari has limited Web Bluetooth support. Please use Chrome or Edge for the best experience.';
+            } else if (!isChromiumBased) {
+                return 'Web Bluetooth requires a Chromium-based browser like Chrome or Edge. Please switch to Chrome or Edge on a secure (HTTPS) connection.';
+            } else {
+                return 'Web Bluetooth is not supported in this browser version. Please update to the latest Chrome or Edge.';
+            }
         }
         
         if (error.name === 'SecurityError') {

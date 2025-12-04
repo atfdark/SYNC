@@ -1440,27 +1440,31 @@
     
                 if (!this.isInitialized) {
                     // Initialization failed earlier (e.g. no Web Bluetooth / insecure origin)
-                    // but we can still run in demo mode using simulated devices
-                    this.log('System not fully initialized. Running device scan in demo mode.');
-                    this._updateConnectionStatus('Bluetooth not available - showing demo speakers only', true);
+                    this.log('System not fully initialized. Bluetooth scan unavailable.');
+                    this._updateConnectionStatus('Bluetooth not available', true);
+                    return;
                 }
     
-                this.log('Scanning for Bluetooth speakers...');
+                this.log('Scanning for real Bluetooth speakers...');
     
                 // Update Scan & Connect button state during scan
                 this.elements.scanBtn.disabled = true;
                 this.elements.scanBtn.textContent = 'Scanning...';
     
                 try {
-                    // Use the device manager to scan for devices (simulated in demo mode)
+                    // Use the device manager to scan for real devices only
                     const availableDevices = await this.audioSyncSystem.deviceManager.scanForDevices();
     
-                    this.log(`Found ${availableDevices.length} devices`);
+                    this.log(`Found ${availableDevices.length} real device(s)`);
     
                     if (availableDevices.length === 0) {
-                        this._updateConnectionStatus('No speakers found', true);
+                        this._updateConnectionStatus('No real Bluetooth speakers found', true);
+                        this._hideSpeakersSection();
                         return;
                     }
+    
+                    // Show speakers section since we have real devices
+                    this._showSpeakersSection();
     
                     // Connect to found devices
                     const deviceConfigs = availableDevices.map(device => ({
@@ -1484,6 +1488,7 @@
                 } catch (error) {
                     this.log(`Device scan failed: ${error.message}`);
                     this._updateConnectionStatus(`Scan failed: ${error.message}`, true);
+                    this._hideSpeakersSection();
                 } finally {
                     // Restore Scan & Connect button state
                     this.elements.scanBtn.disabled = false;
@@ -1535,6 +1540,22 @@
                 this.connectedSpeakers.delete(deviceId);
             }
 
+            _hideSpeakersSection() {
+                // Hide the entire speakers section when no real devices are available
+                const speakersSection = document.querySelector('.speakers-section');
+                if (speakersSection) {
+                    speakersSection.style.display = 'none';
+                }
+            }
+
+            _showSpeakersSection() {
+                // Show the speakers section when we have real devices
+                const speakersSection = document.querySelector('.speakers-section');
+                if (speakersSection) {
+                    speakersSection.style.display = 'block';
+                }
+            }
+
             _hideFileInput() {
                 this.elements.fileInputSection.classList.add('hidden');
             }
@@ -1545,6 +1566,7 @@
                 
                 if (connectedCount > 0) {
                     this._updateConnectionStatus(`${connectedCount} speakers connected`, false);
+                    this._showSpeakersSection();
                     
                     // Add speaker cards for connected devices
                     status.deviceClocks.forEach(deviceId => {
@@ -1554,6 +1576,7 @@
                     });
                 } else {
                     this._updateConnectionStatus('Ready to connect', false);
+                    this._hideSpeakersSection();
                 }
 
                 // Update system audio status

@@ -311,22 +311,22 @@ class DeviceManager extends EventEmitter {
      * Scan for available Bluetooth devices
      *
      * Web Bluetooth requires user interaction to scan. This method attempts to request
-     * a device to trigger the permission dialog, then falls back to simulated devices
-     * for demo purposes if no real device is selected or Web Bluetooth is unavailable.
+     * a real device to trigger the permission dialog. Only real Bluetooth devices
+     * will be returned - no demo or simulated devices are provided.
      *
      * Note: Web Bluetooth API does not support passive scanning. All device discovery
      * requires explicit user interaction through the browser's device selection dialog.
      * This is a fundamental limitation of the Web Bluetooth specification.
      *
      * @param {object} scanOptions - Scan options
-     * @returns {Promise<Array>} Array of available devices
+     * @returns {Promise<Array>} Array of available real devices (empty if none found)
      */
     async scanForDevices(scanOptions = {}) {
         this.log.info('Scanning for Bluetooth devices', scanOptions);
-        console.log('[DEBUG] Starting Bluetooth device scan');
+        console.log('[DEBUG] Starting Bluetooth device scan for real devices only');
 
         try {
-            // First, try to request a real Bluetooth device to trigger permission
+            // Request a real Bluetooth device - user must select one for scan to succeed
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: ['0000110b-0000-1000-8000-00805f9b34fb'] // A2DP
@@ -348,46 +348,16 @@ class DeviceManager extends EventEmitter {
             return realDevices;
 
         } catch (error) {
-            console.log('[DEBUG] Bluetooth scan failed or cancelled, falling back to simulated demo mode:', error.message);
-            this.log.warn('Real Bluetooth scan failed, using simulated devices for demo purposes', { error: error.message });
+            console.log('[DEBUG] Bluetooth scan failed or cancelled:', error.message);
+            this.log.info('Bluetooth scan completed - no real devices selected or available', { error: error.message });
 
-            // Fall back to simulated devices for demo - clearly distinguish from real failures
-            const simulatedDevices = [
-                {
-                    id: 'sim_device_1',
-                    name: 'Bluetooth Speaker 1 (Demo)',
-                    type: 'audio_output',
-                    signalStrength: -45,
-                    battery: 85,
-                    isSimulated: true,
-                    isDemoMode: true
-                },
-                {
-                    id: 'sim_device_2',
-                    name: 'Bluetooth Speaker 2 (Demo)',
-                    type: 'audio_output',
-                    signalStrength: -52,
-                    battery: 67,
-                    isSimulated: true,
-                    isDemoMode: true
-                },
-                {
-                    id: 'sim_device_3',
-                    name: 'Wireless Headphones (Demo)',
-                    type: 'audio_output',
-                    signalStrength: -38,
-                    battery: 92,
-                    isSimulated: true,
-                    isDemoMode: true
-                }
-            ];
-
-            this.emit('deviceScanCompleted', {
-                devices: simulatedDevices,
-                isDemoMode: true,
-                reason: 'Real Bluetooth scan failed - using demo devices'
+            // Return empty array - no demo devices
+            this.emit('deviceScanCompleted', { 
+                devices: [],
+                reason: 'No real devices selected or available',
+                error: error.message
             });
-            return simulatedDevices;
+            return [];
         }
     }
 

@@ -11,31 +11,7 @@ class WebRTCAudioManager extends EventEmitter {
         super();
 
         // Configuration
-        this.iceServers = options.iceServers || [
-            // Multiple STUN servers for better connectivity
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' },
-            // TURN servers for NAT traversal
-            {
-                urls: 'turn:openrelay.metered.ca:80',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            {
-                urls: 'turn:openrelay.metered.ca:443',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            // Alternative TURN server
-            {
-                urls: 'turn:turn.bistri.com:80',
-                username: 'homeo',
-                credential: 'homeo'
-            }
-        ];
+        this.iceServers = options.iceServers || [];
         this.audioConstraints = {
             echoCancellation: false,
             noiseSuppression: false,

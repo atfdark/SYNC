@@ -194,8 +194,7 @@ class SystemAudioCapture extends EventEmitter {
                 this.log.info('System audio capture started successfully');
                 
             } catch (error) {
-                this.log.error('Failed to start audio capture', { error: error.message });
-                throw error;
+                throw new Error(`Failed to start system audio capture: ${error.message}`);
             }
         }
     }

@@ -44,7 +44,10 @@ class WebRTCAudioManager extends EventEmitter {
         };
 
         // Signaling configuration
-        this.signalingServerUrl = options.signalingServerUrl || `${window.location.protocol}//${window.location.host}`;
+        const defaultSignalingUrl =
+            (window.WEBSOCKET_URL && window.WEBSOCKET_URL.trim())
+                || `${window.location.protocol}//${window.location.host}`;
+        this.signalingServerUrl = options.signalingServerUrl || defaultSignalingUrl;
         this.roomId = options.roomId || 'syncplay-room';
         this.clientId = options.clientId || this._generateClientId();
         this.signaling = null;

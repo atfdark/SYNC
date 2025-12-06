@@ -720,6 +720,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-V4x57Z5lN+rk7hOZKpXdK/Cy7Ce/daiUODxPsoxGkFjWQe6Lc7PwgfL7ORzB7eDF2GPhH3ENKJQvCq+/W5ni0A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <div class="player-container">
@@ -862,7 +863,7 @@
                 <!-- Connection QR/URL -->
                 <div class="connection-qr" id="connectionQR" style="display: none;">
                     <div>Visit URL on your mobile device:</div>
-                    <img src="assets/icons/QR CODE.png" width="100" height="100" alt="QR Code" style="display: block; margin: 10px auto; border-radius: 10px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div id="qrCodeContainer" style="width:100px;height:100px;margin:10px auto;"></div>
                     <div class="connection-url" id="connectionURL">
                         https://your-domain.com/mobile-speaker.html
                     </div>
@@ -927,6 +928,7 @@
                 this.currentAudio = document.getElementById('audioPlayer');
                 this.connectedSpeakers = new Map();
                 this.audioLevelMonitoring = false;
+                this.qrCode = null;
 
                 // UI Elements
                 this.elements = {
@@ -1757,6 +1759,21 @@
 
                 this.elements.connectionURL.textContent = mobileURL;
                 this.elements.connectionQR.style.display = 'block';
+
+                // Generate or update QR code dynamically
+                const qrContainer = document.getElementById('qrCodeContainer');
+                if (qrContainer && typeof QRCode !== 'undefined') {
+                    if (!this.qrCode) {
+                        this.qrCode = new QRCode(qrContainer, {
+                            text: mobileURL,
+                            width: 100,
+                            height: 100
+                        });
+                    } else {
+                        this.qrCode.clear();
+                        this.qrCode.makeCode(mobileURL);
+                    }
+                }
 
                 this.log(`Mobile connection URL: ${mobileURL}`);
             }

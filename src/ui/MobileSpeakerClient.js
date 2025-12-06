@@ -54,8 +54,10 @@ class MobileSpeakerClient {
     }
 
     _setupSignaling() {
-        // Use the same host as the current page for signaling
-        const SIGNALING_SERVER_URL = window.location.protocol + '//' + window.location.host;
+        // Use configurable WebSocket URL if provided, otherwise same origin as current page
+        const SIGNALING_SERVER_URL =
+            (window.WEBSOCKET_URL && window.WEBSOCKET_URL.trim())
+                || (window.location.protocol + '//' + window.location.host);
         this.signaling = new WebSocketSignaling(SIGNALING_SERVER_URL);
 
         this.signaling.on('message', (data) => {

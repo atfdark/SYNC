@@ -74,7 +74,7 @@ class WebBluetoothAudioSync extends EventEmitter {
         // WebRTC audio streaming for mobile device connectivity
         this.webrtcManager = new WebRTCAudioManager({
             sampleRate: this.config.sampleRate,
-            signalingServerUrl: window.location.protocol + '//' + window.location.host, // Use current host for signaling
+            signalingServerUrl: window.WEBSOCKET_URL || (window.location.protocol + '//' + window.location.host), // Use configured URL or fallback to current host
             roomId: 'syncplay-room',
             clientId: this.masterPeerId
         });

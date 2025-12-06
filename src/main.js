@@ -409,7 +409,7 @@ class WebBluetoothAudioSync extends EventEmitter {
                 bufferManager: this.bufferManager.getStats(),
                 latencyCompensation: this.latencyCompensation.getStats(),
                 systemAudioCapture: {
-                    isSupported: this.systemAudioCapture.isSupported(),
+                    isSupported: this.isSystemAudioCaptureSupported(),
                     isCapturing: this.systemAudioCapture.getIsCapturing(),
                     bufferStatus: this.systemAudioCapture.getBufferStatus(),
                     stats: this.systemAudioCapture.getStats()
@@ -461,7 +461,7 @@ class WebBluetoothAudioSync extends EventEmitter {
      * @returns {boolean} True if supported
      */
     isSystemAudioCaptureSupported() {
-        return this.systemAudioCapture.isSupported();
+        return this.systemAudioCapture && typeof this.systemAudioCapture.isSupported === 'function' && this.systemAudioCapture.isSupported();
     }
 
     /**
@@ -469,7 +469,7 @@ class WebBluetoothAudioSync extends EventEmitter {
      * @returns {Promise<boolean>} True if permission granted
      */
     async requestSystemAudioPermission() {
-        if (!this.systemAudioCapture.isSupported()) {
+        if (!this.isSystemAudioCaptureSupported()) {
             throw new Error('System audio capture not supported on this browser');
         }
 
@@ -567,7 +567,7 @@ class WebBluetoothAudioSync extends EventEmitter {
             throw new Error('Dual output mode must be enabled');
         }
 
-        if (!this.systemAudioCapture.isSupported()) {
+        if (!this.isSystemAudioCaptureSupported()) {
             throw new Error('System audio capture not supported');
         }
 
@@ -969,7 +969,7 @@ class WebBluetoothAudioSync extends EventEmitter {
             devices: deviceQualities,
             systemQuality: this.driftCorrection.getSystemQuality(),
             dualOutputMode: this.dualOutputMode,
-            systemAudioSupported: this.systemAudioCapture.isSupported()
+            systemAudioSupported: this.isSystemAudioCaptureSupported()
         };
     }
 

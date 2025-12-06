@@ -77,6 +77,7 @@ class WebRTCAudioManager extends EventEmitter {
         };
         
         this.log = logger.createScopedLogger('WebRTCAudioManager');
+        this.iceCandidateBuffers = new Map();
 
         // Initialize signaling
         this._initializeSignaling();
@@ -419,6 +420,18 @@ class WebRTCAudioManager extends EventEmitter {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             console.log('[DEBUG] Remote description set successfully');
 
+            // Add any buffered ICE candidates
+            const buffer = this.iceCandidateBuffers.get(peerId) || [];
+            for (const cand of buffer) {
+                try {
+                    await this.addIceCandidate(peerId, cand);
+                    this.log.debug('Buffered ICE candidate added', { peerId });
+                } catch (error) {
+                    this.log.error('Failed to add buffered ICE candidate', { peerId, error: error.message });
+                }
+            }
+            this.iceCandidateBuffers.delete(peerId);
+
             this.pendingConnections.delete(peerId);
 
             // Update statistics
@@ -620,7 +633,16 @@ class WebRTCAudioManager extends EventEmitter {
         this.log.debug('Received ICE candidate', { fromId });
 
         try {
-            await this.addIceCandidate(fromId, candidate);
+            const peerConnection = this.connections.get(fromId);
+            if (peerConnection && !peerConnection.remoteDescription) {
+                // Buffer the candidate
+                let buffer = this.iceCandidateBuffers.get(fromId) || [];
+                buffer.push(candidate);
+                this.iceCandidateBuffers.set(fromId, buffer);
+                this.log.debug('ICE candidate buffered', { fromId });
+            } else {
+                await this.addIceCandidate(fromId, candidate);
+            }
         } catch (error) {
             this.log.error('Failed to handle incoming ICE candidate', { fromId, error: error.message });
         }
@@ -692,6 +714,18 @@ class WebRTCAudioManager extends EventEmitter {
 
             // Set remote description
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+            // Add any buffered ICE candidates
+            const buffer = this.iceCandidateBuffers.get(peerId) || [];
+            for (const cand of buffer) {
+                try {
+                    await this.addIceCandidate(peerId, cand);
+                    this.log.debug('Buffered ICE candidate added', { peerId });
+                } catch (error) {
+                    this.log.error('Failed to add buffered ICE candidate', { peerId, error: error.message });
+                }
+            }
+            this.iceCandidateBuffers.delete(peerId);
 
             // Create answer
             const answer = await peerConnection.createAnswer({

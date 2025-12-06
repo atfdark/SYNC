@@ -27,6 +27,7 @@ class MobileSpeakerClient {
         this.audioElement = null;
         this.isConnected = false;
         this.deviceId = this._generateDeviceId();
+        this.iceCandidateBuffer = [];
         this.signaling = null;
 
         // UI elements
@@ -220,6 +221,19 @@ class MobileSpeakerClient {
                 new RTCSessionDescription(data.offer)
             );
             console.log('[DEBUG] Remote description set successfully');
+
+            // Add any buffered ICE candidates
+            for (const bufferedCandidate of this.iceCandidateBuffer) {
+                try {
+                    await this.peerConnection.addIceCandidate(bufferedCandidate);
+                    console.log('[DEBUG] Buffered ICE candidate added');
+                    this.log.debug('Buffered ICE candidate added');
+                } catch (error) {
+                    console.error('[DEBUG] Failed to add buffered ICE candidate:', error);
+                    this.log.error('Failed to add buffered ICE candidate', { error: error.message });
+                }
+            }
+            this.iceCandidateBuffer = []; // Clear buffer
 
             // Create answer
             console.log('[DEBUG] Creating answer');
@@ -445,9 +459,15 @@ class MobileSpeakerClient {
                     sdpMLineIndex: candidate.sdpMLineIndex,
                     usernameFragment: candidate.usernameFragment
                 });
-                this.peerConnection.addIceCandidate(iceCandidate);
-                console.log('[DEBUG] ICE candidate added to peer connection successfully');
-                this.log.debug('ICE candidate added to peer connection');
+                if (!this.peerConnection.remoteDescription) {
+                    this.iceCandidateBuffer.push(iceCandidate);
+                    console.log('[DEBUG] ICE candidate buffered');
+                    this.log.debug('ICE candidate buffered');
+                } else {
+                    this.peerConnection.addIceCandidate(iceCandidate);
+                    console.log('[DEBUG] ICE candidate added to peer connection successfully');
+                    this.log.debug('ICE candidate added to peer connection');
+                }
             } else {
                 console.warn('[DEBUG] Cannot add ICE candidate - peerConnection or candidate missing');
             }

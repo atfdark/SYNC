@@ -145,8 +145,26 @@ class MobileSpeakerClient {
             console.log('[DEBUG] Creating RTCPeerConnection');
             this.peerConnection = new RTCPeerConnection({
                 iceServers: [
+                    // STUN servers for NAT traversal
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    // TURN servers for relay when STUN fails
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    // Alternative TURN server
+                    {
+                        urls: 'turn:turn.bistri.com:80',
+                        username: 'homeo',
+                        credential: 'homeo'
+                    }
                 ]
             });
 

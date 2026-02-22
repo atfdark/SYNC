@@ -58,7 +58,7 @@ class MobileSpeakerClient {
         // Use configurable WebSocket URL if provided, otherwise same origin as current page
         const SIGNALING_SERVER_URL =
             (window.WEBSOCKET_URL && window.WEBSOCKET_URL.trim())
-                || (window.location.protocol + '//' + window.location.host);
+            || (window.location.protocol + '//' + window.location.host);
         this.signaling = new WebSocketSignaling(SIGNALING_SERVER_URL);
 
         this.signaling.on('message', (data) => {
@@ -106,6 +106,8 @@ class MobileSpeakerClient {
 
         switch (data.type) {
             case 'webrtc-offer':
+                // Capture the laptop's real dynamic clientId so we can route replies back correctly
+                if (data.fromId) this.laptopClientId = data.fromId;
                 this._handleConnectionOffer(data);
                 break;
             case 'webrtc-ice-candidate':
@@ -144,16 +146,21 @@ class MobileSpeakerClient {
             // Create peer connection
             console.log('[DEBUG] Creating RTCPeerConnection');
             this.peerConnection = new RTCPeerConnection({
-                iceServers: []
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
             });
 
             // Set up event handlers
             this.peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
                     console.log('[DEBUG] Generated ICE candidate:', { type: event.candidate.type, candidate: event.candidate.candidate?.substring(0, 50) + '...' });
+                    // Use the laptop's real clientId captured from the offer, not 'laptop'
+                    const target = this.laptopClientId || 'laptop';
                     this.signaling.sendMessage({
                         type: 'webrtc-ice-candidate',
-                        targetId: 'laptop', // Send to laptop (offerer)
+                        targetId: target,
                         candidate: event.candidate,
                         roomId: 'syncplay-room'
                     });
@@ -239,10 +246,12 @@ class MobileSpeakerClient {
             await this.peerConnection.setLocalDescription(answer);
             console.log('[DEBUG] Local description set');
 
-            // Send answer back to laptop
+            // Send answer back to laptop using its real clientId (captured from the offer)
+            const laptopTarget = this.laptopClientId || data.fromId || 'laptop';
+            console.log('[DEBUG] Sending webrtc-answer to laptopTarget:', laptopTarget);
             const answerMessage = {
                 type: 'webrtc-answer',
-                targetId: 'laptop', // Send to laptop (offerer)
+                targetId: laptopTarget,
                 answer: {
                     type: answer.type,
                     sdp: answer.sdp
@@ -279,13 +288,13 @@ class MobileSpeakerClient {
 
     _handleRemoteAudio(stream) {
         this.log.log('Received remote audio stream');
-        
+
         // Create audio element
         this.audioElement = new Audio();
         this.audioElement.srcObject = stream;
         this.audioElement.autoplay = true;
         this.audioElement.volume = this.elements.volumeSlider.value / 100;
-        
+
         // Set up audio level monitoring
         this.audioElement.addEventListener('play', () => {
             this._startAudioLevelMonitoring();
@@ -298,27 +307,27 @@ class MobileSpeakerClient {
     _handleDataChannelMessage(data) {
         try {
             const message = JSON.parse(data);
-            
+
             switch (message.type) {
                 case 'ping':
-                    this.dataChannel.send(JSON.stringify({ 
-                        type: 'pong', 
-                        timestamp: Date.now() 
+                    this.dataChannel.send(JSON.stringify({
+                        type: 'pong',
+                        timestamp: Date.now()
                     }));
                     break;
-                    
+
                 case 'volumeControl':
                     this._adjustVolume(message.volume * 100);
                     break;
-                    
+
                 case 'testTone':
                     this._playTestTone();
                     break;
-                    
+
                 default:
                     this.log.debug('Unknown message received', { message });
             }
-            
+
         } catch (error) {
             this.log.error('Failed to parse data channel message', { error: error.message });
         }
@@ -358,7 +367,7 @@ class MobileSpeakerClient {
 
     _setConnectedState(connected) {
         this.isConnected = connected;
-        
+
         if (connected) {
             this.elements.statusIndicator.classList.add('connected');
             this.elements.connectBtn.style.display = 'none';
@@ -379,11 +388,11 @@ class MobileSpeakerClient {
 
     _adjustVolume(volume) {
         this.elements.volumeSlider.value = volume;
-        
+
         if (this.audioElement) {
             this.audioElement.volume = volume / 100;
         }
-        
+
         // Send volume update to laptop if connected
         if (this.dataChannel && this.dataChannel.readyState === 'open') {
             this.dataChannel.send(JSON.stringify({
@@ -397,13 +406,13 @@ class MobileSpeakerClient {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
+
         oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        
+
         oscillator.start();
         oscillator.stop(audioContext.currentTime + 0.5);
     }
@@ -417,28 +426,28 @@ class MobileSpeakerClient {
 
     _startAudioLevelMonitoring() {
         if (!this.audioElement) return;
-        
+
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const analyser = audioContext.createAnalyser();
         const source = audioContext.createMediaElementSource(this.audioElement);
-        
+
         source.connect(analyser);
         analyser.connect(audioContext.destination);
-        
+
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
+
         const updateLevel = () => {
             analyser.getByteFrequencyData(dataArray);
             const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
             const level = Math.round((average / 255) * 100);
-            
+
             this.elements.audioLevelFill.style.width = level + '%';
-            
+
             if (this.isConnected) {
                 requestAnimationFrame(updateLevel);
             }
         };
-        
+
         updateLevel();
     }
 
@@ -479,7 +488,7 @@ class MobileSpeakerClient {
         if (this.peerConnection) {
             this.peerConnection.close();
         }
-        
+
         this._setConnectedState(false);
         this.log.log('Mobile speaker disconnected');
     }

@@ -11,7 +11,10 @@ class WebRTCAudioManager extends EventEmitter {
         super();
 
         // Configuration
-        this.iceServers = options.iceServers || [];
+        this.iceServers = options.iceServers || [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ];
         this.audioConstraints = {
             echoCancellation: false,
             noiseSuppression: false,
@@ -22,27 +25,27 @@ class WebRTCAudioManager extends EventEmitter {
         // Signaling configuration
         const defaultSignalingUrl =
             (window.WEBSOCKET_URL && window.WEBSOCKET_URL.trim())
-                || `${window.location.protocol}//${window.location.host}`;
+            || `${window.location.protocol}//${window.location.host}`;
         this.signalingServerUrl = options.signalingServerUrl || defaultSignalingUrl;
         this.roomId = options.roomId || 'syncplay-room';
         this.clientId = options.clientId || this._generateClientId();
         this.signaling = null;
-        
+
         // Connection management
         this.connections = new Map(); // peerId -> RTCPeerConnection
         this.dataChannels = new Map(); // peerId -> RTCDataChannel
         this.remoteAudioStreams = new Map(); // peerId -> MediaStream
-        
+
         // Audio streaming state
         this.isStreaming = false;
         this.audioContext = null;
         this.sourceNode = null;
         this.destinationNode = null;
-        
+
         // Mobile peer tracking
         this.connectedPeers = new Set();
         this.pendingConnections = new Set();
-        
+
         // Statistics
         this.connectionStats = {
             totalConnections: 0,
@@ -51,7 +54,7 @@ class WebRTCAudioManager extends EventEmitter {
             averageConnectionTime: 0,
             totalDataTransferred: 0
         };
-        
+
         this.log = logger.createScopedLogger('WebRTCAudioManager');
         this.iceCandidateBuffers = new Map();
 
@@ -220,10 +223,10 @@ class WebRTCAudioManager extends EventEmitter {
      * @returns {boolean} True if supported
      */
     isSupported() {
-        return !!(window.RTCPeerConnection && 
-                 window.RTCSessionDescription && 
-                 window.RTCIceCandidate &&
-                 this.audioContext);
+        return !!(window.RTCPeerConnection &&
+            window.RTCSessionDescription &&
+            window.RTCIceCandidate &&
+            this.audioContext);
     }
 
     /**
@@ -275,6 +278,35 @@ class WebRTCAudioManager extends EventEmitter {
                 this._handleRemoteStream(peerId, event.streams[0]);
             };
 
+            // Guard: onnegotiationneeded fires immediately on creation (before initial offer).
+            // Only act on it for subsequent renegotiations (e.g. when audio track is added later).
+            let initialOfferCreated = false;
+
+            // When a track is added after connection (e.g. user starts playing music),
+            // WebRTC fires onnegotiationneeded. We re-send an offer so the phone learns about the new track.
+            peerConnection.onnegotiationneeded = async () => {
+                if (!initialOfferCreated) return; // Skip the initial creation trigger
+                // Only renegotiate when in a stable state — otherwise we'd conflict with in-progress negotiation
+                if (peerConnection.signalingState !== 'stable') {
+                    console.log('[DEBUG] onnegotiationneeded skipped — signalingState:', peerConnection.signalingState);
+                    return;
+                }
+                try {
+                    console.log('[DEBUG] onnegotiationneeded fired for peer:', peerId, '— re-negotiating');
+                    const reOffer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(reOffer);
+                    this.signaling.sendMessage({
+                        type: 'webrtc-offer',
+                        targetId: peerId,
+                        offer: { type: reOffer.type, sdp: reOffer.sdp },
+                        roomId: this.roomId
+                    });
+                    console.log('[DEBUG] Re-offer sent to phone for renegotiation');
+                } catch (e) {
+                    console.error('[DEBUG] onnegotiationneeded re-offer failed:', e.message);
+                }
+            };
+
             // Create data channel for control messages
             console.log('[DEBUG] Creating data channel');
             const dataChannel = peerConnection.createDataChannel('audioControl', {
@@ -296,48 +328,36 @@ class WebRTCAudioManager extends EventEmitter {
                 this.log.error('Data channel error', { peerId, error: error.message });
             };
 
-            // Set up ICE gathering with retry logic
-            let iceGatheringResolve;
-            let iceRetryCount = 0;
-            const maxIceRetries = 3;
+            // Add audio track BEFORE creating the offer so it's included in the SDP
+            if (this.activeAudioStream) {
+                const audioTrack = this.activeAudioStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    console.log('[DEBUG] Adding audio track to peer connection before offer');
+                    peerConnection.addTrack(audioTrack, this.activeAudioStream);
+                }
+            } else {
+                console.warn('[DEBUG] No activeAudioStream set — phone will connect but receive no audio yet');
+            }
 
-            const attemptIceGathering = () => new Promise(async (resolve, reject) => {
-                iceGatheringResolve = resolve;
-                const timeout = setTimeout(() => {
-                    if (iceRetryCount < maxIceRetries) {
-                        iceRetryCount++;
-                        this.log.warn(`ICE gathering timeout, retrying (${iceRetryCount}/${maxIceRetries})`);
-                        clearTimeout(timeout);
-                        attemptIceGathering().then(resolve).catch(reject);
-                    } else {
-                        reject(new Error(`ICE gathering failed after ${maxIceRetries} retries`));
-                    }
-                }, 10000 + (iceRetryCount * 5000)); // Increasing timeout
-
-                peerConnection.onicegatheringstatechange = () => {
-                    console.log('[DEBUG] ICE gathering state changed to:', peerConnection.iceGatheringState);
-                    if (peerConnection.iceGatheringState === 'complete') {
-                        clearTimeout(timeout);
-                        resolve();
-                    }
-                };
-            });
+            // Log ICE gathering state changes (trickle ICE: candidates are sent incrementally via onicecandidate)
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('[DEBUG] ICE gathering state changed to:', peerConnection.iceGatheringState);
+            };
 
             // Create offer
             console.log('[DEBUG] Creating WebRTC offer');
             const offer = await peerConnection.createOffer({
-                offerToReceiveAudio: true,
+                offerToReceiveAudio: false, // We are SENDING audio, not receiving
                 offerToReceiveVideo: false,
                 voiceActivityDetection: false
             });
 
             console.log('[DEBUG] Setting local description');
             await peerConnection.setLocalDescription(offer);
-
-            // Wait for ICE gathering to complete with retries
-            console.log('[DEBUG] Waiting for ICE gathering to complete');
-            await attemptIceGathering();
-            console.log('[DEBUG] ICE gathering completed successfully');
+            // Mark initial offer as done — future onnegotiationneeded calls are for renegotiation
+            initialOfferCreated = true;
+            // Trickle ICE: send the offer immediately; candidates flow via onicecandidate
+            console.log('[DEBUG] Offer ready, using trickle ICE');
 
             // Update statistics
             this.connectionStats.totalConnections++;
@@ -523,15 +543,15 @@ class WebRTCAudioManager extends EventEmitter {
      */
     _handleRemoteStream(peerId, stream) {
         this.remoteAudioStreams.set(peerId, stream);
-        
+
         // Create audio element for remote stream
         const audioElement = new Audio();
         audioElement.srcObject = stream;
         audioElement.autoplay = true;
         audioElement.volume = 1.0;
-        
+
         this.emit('remoteStreamReceived', { peerId, stream, audioElement });
-        
+
         this.log.info('Remote audio stream received', { peerId });
     }
 
@@ -748,29 +768,29 @@ class WebRTCAudioManager extends EventEmitter {
     _handleDataChannelMessage(peerId, data) {
         try {
             const message = JSON.parse(data);
-            
+
             switch (message.type) {
                 case 'ping':
                     this._sendDataChannelMessage(peerId, { type: 'pong', timestamp: Date.now() });
                     break;
-                    
+
                 case 'volumeControl':
                     this.emit('volumeControl', { peerId, volume: message.volume });
                     break;
-                    
+
                 case 'audioLevel':
                     this.emit('audioLevel', { peerId, level: message.level });
                     break;
-                    
+
                 default:
                     this.log.debug('Unknown data channel message', { peerId, message });
             }
-            
+
         } catch (error) {
-            this.log.error('Failed to parse data channel message', { 
-                peerId, 
-                data, 
-                error: error.message 
+            this.log.error('Failed to parse data channel message', {
+                peerId,
+                data,
+                error: error.message
             });
         }
     }
@@ -790,7 +810,7 @@ class WebRTCAudioManager extends EventEmitter {
 
             // Add track to all peer connections
             const audioTrack = audioStream.getAudioTracks()[0];
-            
+
             for (const [peerId, peerConnection] of this.connections) {
                 if (peerConnection.connectionState === 'connected') {
                     peerConnection.addTrack(audioTrack, audioStream);
@@ -808,13 +828,48 @@ class WebRTCAudioManager extends EventEmitter {
     }
 
     /**
+     * Set the active audio stream to broadcast to all mobile peers.
+     * Call this whenever playback starts (or when mobile output is first enabled).
+     * @param {MediaStream} stream - The audio stream from captureStream() on an <audio> element
+     */
+    setActiveAudioStream(stream) {
+        this.activeAudioStream = stream;
+        this.log.info('Active audio stream set, pushing to connected peers');
+
+        // Push the track to any peers that are already connected (renegotiation via replaceTrack or addTrack)
+        const audioTrack = stream && stream.getAudioTracks()[0];
+        if (!audioTrack) return;
+
+        for (const [peerId, peerConnection] of this.connections) {
+            try {
+                const senders = peerConnection.getSenders();
+                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                if (audioSender) {
+                    // Replace the existing track (no renegotiation needed)
+                    audioSender.replaceTrack(audioTrack).catch(e =>
+                        this.log.error('replaceTrack failed', { peerId, error: e.message })
+                    );
+                } else if (peerConnection.connectionState === 'connected' ||
+                    peerConnection.connectionState === 'connecting') {
+                    peerConnection.addTrack(audioTrack, stream);
+                    this.log.debug('Audio track added to existing peer', { peerId });
+                }
+            } catch (e) {
+                this.log.error('Failed to push audio track to peer', { peerId, error: e.message });
+            }
+        }
+
+        this.isStreaming = true;
+        this.emit('audioStreamingStarted');
+    }
+
+    /**
      * Stop audio streaming to all peers
      */
     stopAudioStreaming() {
         if (this.isStreaming) {
             this.log.info('Stopping audio streaming');
 
-            // Remove tracks from all peer connections
             for (const [peerId, peerConnection] of this.connections) {
                 if (peerConnection.connectionState === 'connected') {
                     const senders = peerConnection.getSenders();
@@ -826,10 +881,12 @@ class WebRTCAudioManager extends EventEmitter {
                 }
             }
 
+            this.activeAudioStream = null;
             this.isStreaming = false;
             this.emit('audioStreamingStopped');
         }
     }
+
 
     /**
      * Send control message to specific peer
@@ -839,7 +896,7 @@ class WebRTCAudioManager extends EventEmitter {
      */
     _sendDataChannelMessage(peerId, message) {
         const dataChannel = this.dataChannels.get(peerId);
-        
+
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(message));
         }
@@ -862,10 +919,10 @@ class WebRTCAudioManager extends EventEmitter {
      */
     _handlePeerDisconnection(peerId) {
         this.log.info('Peer disconnected', { peerId });
-        
+
         this.connectedPeers.delete(peerId);
         this.pendingConnections.delete(peerId);
-        
+
         this.emit('peerDisconnected', { peerId });
     }
 
@@ -879,7 +936,7 @@ class WebRTCAudioManager extends EventEmitter {
         this.connections.delete(peerId);
         this.dataChannels.delete(peerId);
         this.remoteAudioStreams.delete(peerId);
-        
+
         this.connectionStats.failedConnections++;
     }
 
@@ -890,11 +947,11 @@ class WebRTCAudioManager extends EventEmitter {
      */
     _cleanupPeerConnection(peerId) {
         const peerConnection = this.connections.get(peerId);
-        
+
         if (peerConnection) {
             peerConnection.close();
         }
-        
+
         this.connections.delete(peerId);
         this.dataChannels.delete(peerId);
         this.remoteAudioStreams.delete(peerId);
@@ -908,15 +965,15 @@ class WebRTCAudioManager extends EventEmitter {
      */
     disconnectPeer(peerId) {
         this.log.info('Disconnecting peer', { peerId });
-        
+
         const peerConnection = this.connections.get(peerId);
-        
+
         if (peerConnection) {
             peerConnection.close();
         }
-        
+
         this._cleanupPeerConnection(peerId);
-        
+
         this.emit('peerDisconnected', { peerId });
     }
 
@@ -925,7 +982,7 @@ class WebRTCAudioManager extends EventEmitter {
      */
     disconnectAllPeers() {
         this.log.info('Disconnecting all peers');
-        
+
         for (const peerId of this.connectedPeers) {
             this.disconnectPeer(peerId);
         }

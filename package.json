@@ -23,7 +23,7 @@
   },
   "homepage": "https://web-bluetooth-audio-sync.vercel.app",
   "scripts": {
-    "dev": "npx vercel dev",
+    "dev": "node server/server.js",
     "build": "echo 'Static site - no build required'",
     "start": "node server/server.js",
     "test": "echo 'Tests can be run manually in browser'",
@@ -31,11 +31,12 @@
     "format": "echo 'Code formatting handled by IDE'"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
-    "socket.io-client": "^4.7.5",
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
     "vercel": "^32.0.0"
@@ -45,7 +46,7 @@
   },
   "browserslist": [
     "last 2 Chrome versions",
-    "last 2 Edge versions", 
+    "last 2 Edge versions",
     "last 2 Safari versions",
     "last 2 Firefox versions"
   ],

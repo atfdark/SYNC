@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" "SyncPlay - Multi-Speaker Bluetooth Audio Synchronization">
+    <meta name="description" content="SyncPlay - Multi-Speaker Bluetooth Audio Synchronization">
     <title>SyncPlay - Multi-Speaker Music Player</title>
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2IDJMMTMuNSA1LjVMMTEgNkw5IDlMMTEgMTIuNUwxMy41IDE1TDE2IDEyTDExIDEyTDExIDhMMjIgMTNMMjIgMTBMMTYgMloiIGZpbGw9IiMwMDdiZmYiLz4KPC9zdmc+">
+    <link rel="icon"
+        href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2IDJMMTMuNSA1LjVMMTEgNkw5IDlMMTEgMTIuNUwxMy41IDE1TDE2IDEyTDExIDEyTDExIDhMMjIgMTNMMjIgMTBMMTYgMloiIGZpbGw9IiMwMDdiZmYiLz4KPC9zdmc+">
     <style>
         * {
             margin: 0;
@@ -72,8 +74,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         /* Main Player */
@@ -702,8 +711,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* Utility classes */
@@ -716,13 +730,447 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Spotify Web Playback SDK -->
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <style>
+        /* ── Spotify Integration Styles ──────────────────────────────────── */
+        .spotify-section {
+            background: linear-gradient(135deg, rgba(30, 215, 96, 0.1) 0%, rgba(30, 215, 96, 0.04) 100%);
+            border: 1px solid rgba(30, 215, 96, 0.3);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .spotify-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .spotify-logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spotify-logo-area svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .spotify-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1ed760;
+        }
+
+        .spotify-login-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 28px;
+            background: #1ed760;
+            color: #000;
+            font-weight: 700;
+            font-size: 15px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .spotify-login-btn:hover {
+            background: #18c155;
+            transform: scale(1.03);
+        }
+
+        .spotify-logout-btn {
+            padding: 6px 16px;
+            background: transparent;
+            color: #1ed760;
+            border: 1px solid #1ed760;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .spotify-logout-btn:hover {
+            background: rgba(30, 215, 96, 0.15);
+        }
+
+        .spotify-user-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spotify-user-name {
+            color: #1ed760;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Search */
+        .spotify-search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .spotify-search-bar input {
+            flex: 1;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 25px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .spotify-search-bar input:focus {
+            border-color: #1ed760;
+        }
+
+        .spotify-search-bar input::placeholder {
+            color: #888;
+        }
+
+        .spotify-search-bar button {
+            padding: 12px 22px;
+            background: #1ed760;
+            color: #000;
+            font-weight: 700;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .spotify-search-bar button:hover {
+            background: #18c155;
+        }
+
+        /* Track List */
+        .spotify-tracks {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 380px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #1ed760 rgba(255, 255, 255, 0.05);
+        }
+
+        .spotify-track-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .spotify-track-item:hover {
+            background: rgba(30, 215, 96, 0.12);
+            border-color: rgba(30, 215, 96, 0.25);
+        }
+
+        .spotify-track-item.playing {
+            background: rgba(30, 215, 96, 0.18);
+            border-color: rgba(30, 215, 96, 0.4);
+        }
+
+        .spotify-track-cover {
+            width: 46px;
+            height: 46px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .spotify-track-cover-placeholder {
+            width: 46px;
+            height: 46px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .spotify-track-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .spotify-track-name {
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .spotify-track-artist {
+            font-size: 12px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .spotify-track-duration {
+            font-size: 12px;
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        .spotify-play-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .spotify-track-item:hover .spotify-play-icon,
+        .spotify-track-item.playing .spotify-play-icon {
+            opacity: 1;
+        }
+
+        /* Now Playing bar */
+        .spotify-now-playing {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(30, 215, 96, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(30, 215, 96, 0.2);
+            animation: fadeIn 0.4s ease;
+        }
+
+        .spotify-np-cover {
+            width: 44px;
+            height: 44px;
+            border-radius: 6px;
+            object-fit: cover;
+        }
+
+        .spotify-np-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .spotify-np-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1ed760;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .spotify-np-artist {
+            font-size: 12px;
+            color: #b8c5d6;
+        }
+
+        .spotify-np-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .spotify-np-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+
+        .spotify-np-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .spotify-status-hint {
+            font-size: 13px;
+            color: #888;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .spotify-connecting {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #b8c5d6;
+            font-size: 14px;
+            padding: 10px 0;
+        }
+
+        .spotify-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(30, 215, 96, 0.3);
+            border-top-color: #1ed760;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* ── Now Playing Card ──────────────────────────────────── */
+        .spotify-np-card {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+            background: rgba(30, 215, 96, 0.07);
+            border: 1px solid rgba(30, 215, 96, 0.2);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .spotify-np-big-cover {
+            width: 90px;
+            height: 90px;
+            border-radius: 10px;
+            object-fit: cover;
+            flex-shrink: 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .spotify-np-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .spotify-np-playing-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #1ed760;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+
+        .spotify-np-dot {
+            width: 8px;
+            height: 8px;
+            background: #1ed760;
+            border-radius: 50%;
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(0.7);
+            }
+        }
+
+        .spotify-np-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 3px;
+        }
+
+        .spotify-np-artist {
+            font-size: 13px;
+            color: #b8c5d6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .spotify-np-device {
+            font-size: 11px;
+            color: #1ed760;
+            opacity: 0.7;
+            margin-bottom: 8px;
+        }
+
+        .spotify-np-progress-wrap {
+            width: 100%;
+        }
+
+        .spotify-np-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .spotify-np-progress-fill {
+            height: 100%;
+            background: #1ed760;
+            border-radius: 2px;
+            transition: width 1s linear;
+            width: 0%;
+        }
+
+        .spotify-np-times {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #888;
+        }
+
+        .spotify-sync-hint {
+            text-align: center;
+            font-size: 13px;
+            color: #b8c5d6;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 10px 16px;
+        }
+    </style>
 </head>
+
 <body>
     <div class="player-container">
         <!-- Header -->
@@ -789,11 +1237,87 @@
             </section>
         </main>
 
+        <!-- Spotify – Now Playing Detector -->
+        <section class="spotify-section" id="spotifySection">
+            <div class="spotify-header">
+                <div class="spotify-logo-area">
+                    <svg viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#1ed760"
+                            d="M84 0C37.6 0 0 37.6 0 84s37.6 84 84 84 84-37.6 84-84S130.4 0 84 0zm38.6 121.2c-1.5 2.5-4.8 3.3-7.3 1.7-20-12.2-45.2-15-74.9-8.2-2.9.7-5.7-1.1-6.4-4-.7-2.9 1.1-5.7 4-6.4 32.5-7.4 60.4-4.2 83 9.6 2.5 1.6 3.2 4.8 1.6 7.3zm10.3-22.9c-2 3.2-6.1 4.2-9.3 2.3-22.9-14.1-57.8-18.2-84.9-9.9-3.4 1-7-1-8-4.4-1-3.4 1-7 4.4-8 30.9-9.4 69.2-4.8 95.4 11.3 3.2 2 4.2 6.1 2.4 9.7zm.9-23.9C108.4 57.4 65.5 56 43.7 62.5c-4 1.2-8.3-1.1-9.5-5.1-1.2-4 1.1-8.3 5.1-9.5 24.8-7.5 66.1-6.1 92.2 10.1 3.7 2.2 4.9 6.9 2.7 10.6-2.2 3.7-7 4.9-10.7 2.7l.3-.1z" />
+                    </svg>
+                    <span class="spotify-title">Spotify</span>
+                </div>
+                <div id="spotifyAuthArea">
+                    <a href="/login" class="spotify-login-btn" id="spotifyLoginBtn">
+                        <svg width="16" height="16" viewBox="0 0 168 168">
+                            <path fill="#000"
+                                d="M84 0C37.6 0 0 37.6 0 84s37.6 84 84 84 84-37.6 84-84S130.4 0 84 0zm38.6 121.2c-1.5 2.5-4.8 3.3-7.3 1.7-20-12.2-45.2-15-74.9-8.2-2.9.7-5.7-1.1-6.4-4-.7-2.9 1.1-5.7 4-6.4 32.5-7.4 60.4-4.2 83 9.6 2.5 1.6 3.2 4.8 1.6 7.3zm10.3-22.9c-2 3.2-6.1 4.2-9.3 2.3-22.9-14.1-57.8-18.2-84.9-9.9-3.4 1-7-1-8-4.4-1-3.4 1-7 4.4-8 30.9-9.4 69.2-4.8 95.4 11.3 3.2 2 4.2 6.1 2.4 9.7zm.9-23.9C108.4 57.4 65.5 56 43.7 62.5c-4 1.2-8.3-1.1-9.5-5.1-1.2-4 1.1-8.3 5.1-9.5 24.8-7.5 66.1-6.1 92.2 10.1 3.7 2.2 4.9 6.9 2.7 10.6-2.2 3.7-7 4.9-10.7 2.7l.3-.1z" />
+                        </svg>
+                        Connect Spotify
+                    </a>
+                </div>
+            </div>
+
+            <!-- Not logged in -->
+            <div id="spotifyLoggedOut">
+                <div class="spotify-status-hint">
+                    🎧 Connect your Spotify account — whatever you play on <strong>any Spotify device</strong> will
+                    automatically show up here and sync to all connected speakers.
+                </div>
+            </div>
+
+            <!-- Logged in -->
+            <div id="spotifyLoggedIn" style="display:none;">
+
+                <!-- Scanning indicator -->
+                <div class="spotify-connecting" id="spotifyScanning">
+                    <div class="spotify-spinner"></div>
+                    <span>Listening for Spotify playback…</span>
+                </div>
+
+                <!-- Now Playing card (shown when a track is detected) -->
+                <div id="spotifyNowPlaying" style="display:none;">
+                    <div class="spotify-np-card">
+                        <img class="spotify-np-big-cover" id="spotifyNpCover" src="" alt="album art">
+                        <div class="spotify-np-details">
+                            <div class="spotify-np-playing-label">
+                                <span class="spotify-np-dot"></span> Now Playing on Spotify
+                            </div>
+                            <div class="spotify-np-title" id="spotifyNpTitle">—</div>
+                            <div class="spotify-np-artist" id="spotifyNpArtist">—</div>
+                            <div class="spotify-np-device" id="spotifyNpDevice"></div>
+                            <div class="spotify-np-progress-wrap">
+                                <div class="spotify-np-progress-bar">
+                                    <div class="spotify-np-progress-fill" id="spotifyNpProgress"></div>
+                                </div>
+                                <div class="spotify-np-times">
+                                    <span id="spotifyNpElapsed">0:00</span>
+                                    <span id="spotifyNpDuration">0:00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="spotify-sync-hint">
+                        🔊 Enable <strong>Mobile Speaker Connection</strong> below and connect your phones to hear this
+                        everywhere!
+                    </div>
+                </div>
+
+                <!-- Nothing playing state -->
+                <div id="spotifyNothing" style="display:none;">
+                    <div class="spotify-status-hint">▶️ Play something on Spotify (any device) and it will appear here
+                        automatically.</div>
+                </div>
+            </div>
+        </section>
+
+
+
         <!-- File Input Section -->
         <section class="file-input-section" id="fileInputSection">
             <div class="fade-in">
-                <h3 style="margin-bottom: 15px;">Choose Your Music</h3>
-                <p style="color: #b8c5d6; margin-bottom: 20px;">Select audio files or drag them here</p>
+                <h3 style="margin-bottom: 15px;">Or Browse Local Files</h3>
+                <p style="color: #b8c5d6; margin-bottom: 20px;">Drag audio files here or click to browse</p>
                 <label for="fileInput" class="file-input-label">
                     📁 Browse Files
                 </label>
@@ -808,7 +1332,7 @@
         <section class="system-audio-section" id="systemAudioSection">
             <div class="fade-in">
                 <h3 style="margin-bottom: 20px;">🎧 System Audio Capture</h3>
-                
+
                 <!-- Dual Output Toggle -->
                 <div class="dual-output-toggle">
                     <div class="toggle-switch" id="dualOutputToggle">
@@ -825,7 +1349,7 @@
                     <button class="capture-btn stop-capture-btn" id="stopCaptureBtn" style="display: none;">
                         ⏹️ Stop Capture
                     </button>
-                    
+
                     <!-- Audio Level Indicator -->
                     <div class="audio-level-indicator">
                         <div class="audio-level-fill" id="audioLevelFill"></div>
@@ -833,7 +1357,8 @@
                 </div>
 
                 <div class="system-audio-info" id="systemAudioInfo">
-                    <p>Enable dual output to play audio through both your laptop speakers and connected Bluetooth devices simultaneously.</p>
+                    <p>Enable dual output to play audio through both your laptop speakers and connected Bluetooth
+                        devices simultaneously.</p>
                     <p id="captureStatus" style="margin-top: 10px; font-size: 12px; color: #888;">
                         System audio capture requires permission and browser support.
                     </p>
@@ -845,7 +1370,7 @@
         <section class="mobile-connectivity-section" id="mobileConnectivitySection">
             <div class="fade-in">
                 <h3 style="margin-bottom: 20px;">📱 Mobile Speaker Connection</h3>
-                
+
                 <!-- Mobile Output Toggle -->
                 <div class="dual-output-toggle">
                     <div class="toggle-switch" id="mobileOutputToggle">
@@ -898,12 +1423,150 @@
     <audio id="audioPlayer" preload="metadata"></audio>
 
     <script type="module">
-        // Import the main system
+        // Import the main system and Spotify manager
         import { WebBluetoothAudioSync } from './src/main.js';
+        import { SpotifyManager } from './src/spotify/SpotifyManager.js';
+
+        // ── Spotify Now-Playing Detector ────────────────────────────────────
+        let spotifyManager = null;
+
+        async function initSpotify() {
+            const loggedIn = await SpotifyManager.isLoggedIn();
+            const authArea = document.getElementById('spotifyAuthArea');
+            const loggedOut = document.getElementById('spotifyLoggedOut');
+            const loggedInEl = document.getElementById('spotifyLoggedIn');
+
+            if (!loggedIn) {
+                loggedOut.style.display = '';
+                loggedInEl.style.display = 'none';
+                return;
+            }
+
+            loggedOut.style.display = 'none';
+            loggedInEl.style.display = '';
+
+            // Swap login button → logout
+            authArea.innerHTML = `
+                <div class="spotify-user-badge">
+                    <span class="spotify-user-name">✅ Connected</span>
+                    <button class="spotify-logout-btn" id="spotifyLogoutBtn">Disconnect</button>
+                </div>`;
+            document.getElementById('spotifyLogoutBtn').onclick = async () => {
+                await fetch('/api/logout', { method: 'POST' });
+                location.reload();
+            };
+
+            // Start polling
+            try {
+                spotifyManager = new SpotifyManager();
+                spotifyManager.addEventListener('stateChanged', (e) => {
+                    updateNowPlaying(e.detail);
+                });
+                await spotifyManager.init();
+                setupSpotifyControls();
+            } catch (err) {
+                document.getElementById('spotifyScanning').innerHTML =
+                    `<span style="color:#ff6b6b">⚠️ ${err.message}</span>`;
+            }
+        }
+
+        let _progressInterval = null;
+        let _progressStart = 0, _progressMs = 0, _progressDur = 0;
+
+        function updateNowPlaying(state) {
+            const scanning = document.getElementById('spotifyScanning');
+            const npCard = document.getElementById('spotifyNowPlaying');
+            const nothing = document.getElementById('spotifyNothing');
+
+            if (!state || !state.track) {
+                scanning.style.display = 'none';
+                npCard.style.display = 'none';
+                nothing.style.display = '';
+                clearInterval(_progressInterval);
+                return;
+            }
+
+            scanning.style.display = 'none';
+            nothing.style.display = 'none';
+            npCard.style.display = '';
+
+            const { track, isPlaying, progress_ms, device } = state;
+
+            // Update play/pause button icon
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            if (playPauseBtn) playPauseBtn.textContent = isPlaying ? '⏸️' : '▶️';
+
+            document.getElementById('spotifyNpTitle').textContent = track.name || '—';
+            document.getElementById('spotifyNpArtist').textContent = track.artists?.map(a => a.name).join(', ') || '—';
+            document.getElementById('spotifyNpDevice').textContent = device ? `🔊 ${device.name}` : '';
+
+            const img = track.album?.images?.[0]?.url;
+            const cover = document.getElementById('spotifyNpCover');
+            cover.src = img || ''; cover.style.display = img ? '' : 'none';
+
+            // Also update the main album art
+            if (img) {
+                const albumArt = document.getElementById('albumArt');
+                let imgEl = albumArt.querySelector('img.spotify-album-img');
+                if (!imgEl) {
+                    imgEl = document.createElement('img');
+                    imgEl.className = 'spotify-album-img';
+                    imgEl.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:15px;position:absolute;top:0;left:0;';
+                    albumArt.appendChild(imgEl);
+                }
+                imgEl.src = img;
+                const ph = document.getElementById('albumPlaceholder');
+                if (ph) ph.style.display = 'none';
+            }
+            document.getElementById('songTitle').textContent = track.name || 'Spotify';
+            document.getElementById('songArtist').textContent = track.artists?.map(a => a.name).join(', ') || '';
+
+            // Progress bar
+            clearInterval(_progressInterval);
+            _progressMs = progress_ms || 0;
+            _progressDur = track.duration_ms || 1;
+            _progressStart = Date.now();
+
+            function tickProgress() {
+                const elapsed = _progressMs + (isPlaying ? (Date.now() - _progressStart) : 0);
+                const pct = Math.min(100, (elapsed / _progressDur) * 100);
+                const fill = document.getElementById('spotifyNpProgress');
+                const el = document.getElementById('spotifyNpElapsed');
+                const dur = document.getElementById('spotifyNpDuration');
+                if (fill) fill.style.width = pct + '%';
+                if (el) el.textContent = fmtMs(elapsed);
+                if (dur) dur.textContent = fmtMs(_progressDur);
+            }
+            tickProgress();
+            if (isPlaying) _progressInterval = setInterval(tickProgress, 1000);
+        }
+
+        function fmtMs(ms) {
+            const s = Math.max(0, Math.floor(ms / 1000));
+            return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        }
+
+        function setupSpotifyControls() {
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            playPauseBtn.addEventListener('click', () => {
+                if (spotifyManager) spotifyManager.togglePlayPause();
+            });
+            prevBtn.addEventListener('click', () => {
+                if (spotifyManager) spotifyManager.skipToPrevious();
+            });
+            nextBtn.addEventListener('click', () => {
+                if (spotifyManager) spotifyManager.skipToNext();
+            });
+        }
+
+
 
         // Patch for AudioContext compatibility
         const originalAudioContext = window.AudioContext;
-        window.AudioContext = function(...args) {
+        window.AudioContext = function (...args) {
             try {
                 return new originalAudioContext(...args);
             } catch (e) {
@@ -915,7 +1578,6 @@
             }
         };
 
-        
         /**
          * Music Player with Multi-Speaker Synchronization
          */
@@ -978,17 +1640,12 @@
                 this._setupEventListeners();
                 this._setupDragAndDrop();
                 this._initializeSystem();
-
-                // Enable mobile output by default for demo
-                setTimeout(() => {
-                    this._toggleMobileOutput();
-                }, 2000);
             }
 
             async _initializeSystem() {
                 try {
                     this.log('Initializing SyncPlay Music Player...');
-    
+
                     // Initialize the audio sync system
                     this.audioSyncSystem = new WebBluetoothAudioSync({
                         syncTolerance: 1,
@@ -996,12 +1653,12 @@
                         sampleRate: 44100,
                         enableLogging: true
                     });
-    
+
                     // Try to fully initialize the system, but gracefully fall back to demo mode
                     try {
                         await this.audioSyncSystem.initialize();
                         this.isInitialized = true;
-    
+
                         this._updateConnectionStatus('Ready to connect', false);
                         this.log('System initialized successfully');
                     } catch (error) {
@@ -1011,19 +1668,19 @@
                         this.log(`Initialization error (falling back to demo mode): ${error.message}`);
                         this._updateConnectionStatus('Bluetooth unavailable - running in demo mode', true);
                     }
-    
+
                     // Always set up system event handlers once we have an audioSyncSystem instance
                     if (this.audioSyncSystem) {
                         this._setupSystemEventHandlers();
                     }
-    
+
                     // Auto-scan and connect to devices for demo (uses simulated devices when needed)
                     setTimeout(() => {
                         if (this.audioSyncSystem) {
                             this._scanForDevices();
                         }
                     }, 1000);
-    
+
                 } catch (error) {
                     // Constructor failed or some truly fatal error occurred
                     this.log(`Initialization error: ${error.message}`);
@@ -1080,7 +1737,7 @@
                     this._updateCaptureStatus('System audio capture active - audio playing through both laptop and connected speakers!', false);
                     this.elements.startCaptureBtn.style.display = 'none';
                     this.elements.stopCaptureBtn.style.display = 'inline-block';
-                    
+
                     // Start audio level monitoring
                     this._startAudioLevelMonitoring();
                 });
@@ -1089,7 +1746,7 @@
                     this._updateCaptureStatus('System audio capture stopped', false);
                     this.elements.startCaptureBtn.style.display = this.audioSyncSystem.dualOutputMode ? 'inline-block' : 'none';
                     this.elements.stopCaptureBtn.style.display = 'none';
-                    
+
                     // Stop audio level monitoring
                     this._stopAudioLevelMonitoring();
                 });
@@ -1151,12 +1808,12 @@
 
                 // Progress bar
                 this.elements.progressBar.addEventListener('click', (e) => this._seekAudio(e));
-                
+
                 // Volume slider
                 this.elements.volumeSlider.addEventListener('click', (e) => this._adjustVolume(e));
 
                 // Scan for devices
-                 this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
+                this.elements.scanBtn.addEventListener('click', () => this._scanForDevices());
 
                 // System Audio controls
                 this.elements.dualOutputToggle.addEventListener('click', () => this._toggleDualOutput());
@@ -1198,9 +1855,9 @@
                 if (files.length === 0) return;
 
                 this.log(`Selected ${files.length} file(s)`);
-                
+
                 // Convert file list to array and filter audio files
-                const audioFiles = Array.from(files).filter(file => 
+                const audioFiles = Array.from(files).filter(file =>
                     file.type.startsWith('audio/')
                 );
 
@@ -1232,16 +1889,16 @@
                 if (this.playlist.length === 0) return;
 
                 const currentSong = this.playlist[this.currentSongIndex];
-                
+
                 this.log(`Loading: ${currentSong.title}`);
-                
+
                 // Update UI
                 this.elements.songTitle.textContent = currentSong.title;
                 this.elements.songArtist.textContent = currentSong.artist;
-                
+
                 // Load audio
                 this.currentAudio.src = currentSong.url;
-                
+
                 try {
                     await this.currentAudio.load();
                     this.log(`Loaded: ${currentSong.title}`);
@@ -1256,7 +1913,7 @@
                     return;
                 }
 
-                if (!this.audioSyncSystem || !this.audioSyncSystem.isInitialized) {
+                if (!this.audioSyncSystem) {
                     this.log('Audio system not ready');
                     return;
                 }
@@ -1274,28 +1931,34 @@
 
             async _startPlayback() {
                 this.log('Starting playback...');
-                
+
                 try {
-                    // Start the audio sync system if not running
-                    if (!this.audioSyncSystem.isRunning) {
-                        await this.audioSyncSystem.start();
+                    // Start the audio sync system if fully initialized and not already running
+                    if (this.audioSyncSystem && this.audioSyncSystem.isInitialized && !this.audioSyncSystem.isRunning) {
+                        try {
+                            await this.audioSyncSystem.start();
+                        } catch (syncError) {
+                            this.log(`Sync system start failed (playing locally only): ${syncError.message}`);
+                        }
                     }
 
-                    // Start local audio playback
-                    this.currentAudio.play();
+                    // Start local audio playback (always works, no Bluetooth required)
+                    await this.currentAudio.play();
                     this.isPlaying = true;
-                    
+
+
+
                     // Update play button
                     this.elements.playPauseBtn.innerHTML = '⏸️';
-                    
-                    // Start synchronized playback on connected speakers
-                    if (this.connectedSpeakers.size > 0) {
+
+                    // Start synchronized playback on connected speakers (only if fully initialized)
+                    if (this.audioSyncSystem && this.audioSyncSystem.isInitialized && this.connectedSpeakers.size > 0) {
                         const audioBuffer = await this._createAudioBuffer();
                         await this.audioSyncSystem.startSynchronizedPlayback(audioBuffer);
                     }
-                    
+
                     this.log('Playback started');
-                    
+
                 } catch (error) {
                     this.log(`Failed to start playback: ${error.message}`);
                     this.isPlaying = false;
@@ -1305,14 +1968,14 @@
 
             async _pausePlayback() {
                 this.log('Pausing playback...');
-                
+
                 try {
                     this.currentAudio.pause();
                     this.isPlaying = false;
-                    
+
                     // Update play button
                     this.elements.playPauseBtn.innerHTML = '▶️';
-                    
+
                     // Stop synchronized playback
                     if (this.audioSyncSystem.isRunning) {
                         // Find active session
@@ -1322,9 +1985,9 @@
                             // For demo purposes, we'll just stop the local audio
                         }
                     }
-                    
+
                     this.log('Playback paused');
-                    
+
                 } catch (error) {
                     this.log(`Failed to pause playback: ${error.message}`);
                 }
@@ -1332,13 +1995,13 @@
 
             async _previousSong() {
                 if (this.playlist.length === 0) return;
-                
-                this.currentSongIndex = this.currentSongIndex > 0 
-                    ? this.currentSongIndex - 1 
+
+                this.currentSongIndex = this.currentSongIndex > 0
+                    ? this.currentSongIndex - 1
                     : this.playlist.length - 1;
-                
+
                 await this._loadCurrentSong();
-                
+
                 if (this.isPlaying) {
                     await this._startPlayback();
                 }
@@ -1346,13 +2009,13 @@
 
             async _nextSong() {
                 if (this.playlist.length === 0) return;
-                
-                this.currentSongIndex = this.currentSongIndex < this.playlist.length - 1 
-                    ? this.currentSongIndex + 1 
+
+                this.currentSongIndex = this.currentSongIndex < this.playlist.length - 1
+                    ? this.currentSongIndex + 1
                     : 0;
-                
+
                 await this._loadCurrentSong();
-                
+
                 if (this.isPlaying) {
                     await this._startPlayback();
                 }
@@ -1380,7 +2043,7 @@
                 const rect = this.elements.volumeSlider.getBoundingClientRect();
                 const pos = (e.clientX - rect.left) / rect.width;
                 const volume = Math.max(0, Math.min(1, pos));
-                
+
                 this.currentAudio.volume = volume;
                 this._updateVolumeDisplay(volume);
             }
@@ -1414,9 +2077,9 @@
 
             _onAudioEnded() {
                 this.log('Audio ended');
-                
+
                 const repeatActive = this.elements.repeatBtn.classList.contains('active');
-                
+
                 if (repeatActive) {
                     this.currentAudio.currentTime = 0;
                     this.currentAudio.play();
@@ -1440,35 +2103,35 @@
                     this._updateConnectionStatus('System not ready. Please reload the page.', true);
                     return;
                 }
-    
+
                 if (!this.isInitialized) {
                     // Initialization failed earlier (e.g. no Web Bluetooth / insecure origin)
                     this.log('System not fully initialized. Bluetooth scan unavailable.');
                     this._updateConnectionStatus('Bluetooth not available', true);
                     return;
                 }
-    
+
                 this.log('Scanning for real Bluetooth speakers...');
-    
+
                 // Update Scan & Connect button state during scan
                 this.elements.scanBtn.disabled = true;
                 this.elements.scanBtn.textContent = 'Scanning...';
-    
+
                 try {
                     // Use the device manager to scan for real devices only
                     const availableDevices = await this.audioSyncSystem.deviceManager.scanForDevices();
-    
+
                     this.log(`Found ${availableDevices.length} real device(s)`);
-    
+
                     if (availableDevices.length === 0) {
                         this._updateConnectionStatus('No real Bluetooth speakers found', true);
                         this._hideSpeakersSection();
                         return;
                     }
-    
+
                     // Show speakers section since we have real devices
                     this._showSpeakersSection();
-    
+
                     // Connect to found devices
                     const deviceConfigs = availableDevices.map(device => ({
                         id: device.id,
@@ -1476,18 +2139,18 @@
                         serviceUuid: '0000110b-0000-1000-8000-00805f9b34fb', // A2DP UUID
                         isSimulated: device.isSimulated || false
                     }));
-    
+
                     const results = await this.audioSyncSystem.connectDevices(deviceConfigs);
                     const successful = results.filter(r => r && r.success).length;
-    
+
                     if (successful > 0) {
                         this._updateConnectionStatus(`${successful} speaker(s) connected`, false);
                     } else {
                         this._updateConnectionStatus('Failed to connect to any speakers', true);
                     }
-    
+
                     this.log('Connection results:', results);
-    
+
                 } catch (error) {
                     this.log(`Device scan failed: ${error.message}`);
                     this._updateConnectionStatus(`Scan failed: ${error.message}`, true);
@@ -1516,7 +2179,7 @@
                 const card = document.createElement('div');
                 card.className = 'speaker-card fade-in';
                 card.id = `speaker-${deviceId}`;
-                
+
                 card.innerHTML = `
                     <div class="speaker-header">
                         <div class="speaker-name">${deviceName}</div>
@@ -1530,7 +2193,7 @@
                         </div>
                     </div>
                 `;
-                
+
                 this.elements.speakersGrid.appendChild(card);
                 this.connectedSpeakers.set(deviceId, { name: deviceName, enabled: true });
             }
@@ -1566,11 +2229,11 @@
             _updateSystemStatus() {
                 const status = this.audioSyncSystem.getSystemStatus();
                 const connectedCount = status.activeDevices;
-                
+
                 if (connectedCount > 0) {
                     this._updateConnectionStatus(`${connectedCount} speakers connected`, false);
                     this._showSpeakersSection();
-                    
+
                     // Add speaker cards for connected devices
                     status.deviceClocks.forEach(deviceId => {
                         if (!this.connectedSpeakers.has(deviceId)) {
@@ -1638,14 +2301,14 @@
                             throw error;
                         }
                         this.elements.dualOutputToggle.classList.add('active');
-            
+
                         this.log('Dual output mode enabled');
-                        
+
                     } else {
                         // Disable dual output mode
                         await this.audioSyncSystem.enableDualOutput(false);
                         this.elements.dualOutputToggle.classList.remove('active');
-                        
+
                         this.log('Dual output mode disabled');
                     }
                 } catch (error) {
@@ -1663,12 +2326,12 @@
 
                     // Request permission
                     await this.audioSyncSystem.requestSystemAudioPermission();
-                    
+
                     // Start capture
                     await this.audioSyncSystem.startSystemAudioCapture();
-                    
+
                     this.log('System audio capture started');
-                    
+
                 } catch (error) {
                     this.log(`Failed to start system audio capture: ${error.message}`);
                     this._updateCaptureStatus(`Failed to start capture: ${error.message}`, true);
@@ -1687,7 +2350,7 @@
             _updateSystemAudioUI(enabled) {
                 if (enabled) {
                     this.elements.systemAudioControls.style.display = 'flex';
-                    
+
                     // Check if system audio capture is supported
                     if (this.audioSyncSystem.isSystemAudioCaptureSupported()) {
                         this.elements.startCaptureBtn.style.display = 'inline-block';
@@ -1734,8 +2397,11 @@
                         await this.audioSyncSystem.enableMobileOutput(true);
                         this.elements.mobileOutputToggle.classList.add('active');
 
+                        // Capture system audio (works for Spotify, browser tabs, anything playing on laptop)
+                        await this._startSystemAudioCapture();
+
                         // Show connection information
-                        this._showMobileConnectionInfo();
+                        await this._showMobileConnectionInfo();
 
                         this.log('Mobile output mode enabled');
 
@@ -1753,10 +2419,84 @@
             }
 
 
-            _showMobileConnectionInfo() {
-                // Generate connection URL
-                const baseURL = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
-                const mobileURL = baseURL + 'mobile-speaker.html';
+
+            /**
+             * Capture system audio (works for Spotify, local files, anything on the laptop)
+             * using getDisplayMedia with audio-only. Browser will prompt the user to pick a
+             * source — make sure to tick "Share system audio" / "Share tab audio" in the dialog.
+             */
+            async _startSystemAudioCapture() {
+                try {
+                    this.log('Requesting system audio capture via getDisplayMedia...');
+
+                    // Stop any previously captured stream
+                    if (this._systemAudioStream) {
+                        this._systemAudioStream.getTracks().forEach(t => t.stop());
+                        this._systemAudioStream = null;
+                    }
+
+                    // Chrome only shows "Share system audio" when video is also requested.
+                    // We immediately stop the video track — we only need the audio.
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
+
+                    // Drop the video track — we only want audio
+                    stream.getVideoTracks().forEach(t => t.stop());
+
+                    const audioTrack = stream.getAudioTracks()[0];
+                    if (!audioTrack) {
+                        this.log('⚠ No audio track in captured stream — did you check "Share system audio"?');
+                        alert('No audio was captured. Please re-enable Mobile Speaker and check "Share system audio" / "Share tab audio" in the browser dialog.');
+                        return;
+                    }
+
+                    this._systemAudioStream = stream;
+
+                    // When the user stops sharing (clicks "Stop sharing" in browser), clean up
+                    audioTrack.onended = () => {
+                        this.log('System audio capture ended');
+                        this._systemAudioStream = null;
+                        if (this.audioSyncSystem) {
+                            this.audioSyncSystem.setMobileAudioStream(null);
+                        }
+                    };
+
+                    // Push the stream to WebRTC — phones will now hear laptop audio
+                    if (this.audioSyncSystem) {
+                        this.audioSyncSystem.setMobileAudioStream(stream);
+                    }
+
+                    this.log('✅ System audio capture started — phone should now receive audio');
+
+                } catch (err) {
+                    if (err.name === 'NotAllowedError' || err.name === 'TypeError') {
+                        // User cancelled the dialog — not an error
+                        this.log('System audio capture cancelled by user');
+                    } else {
+                        this.log(`System audio capture failed: ${err.message}`);
+                        console.error('[DEBUG] getDisplayMedia error:', err);
+                    }
+                }
+            }
+
+            async _showMobileConnectionInfo() {
+                // Fetch the real LAN IP from the server so the phone can reach it
+                let mobileURL;
+                try {
+                    const ipRes = await fetch('/api/local-ip');
+                    const { ip, port } = await ipRes.json();
+                    mobileURL = `http://${ip}:${port}/mobile-speaker.html`;
+                } catch (e) {
+                    // Fallback: use whatever the browser shows (may be localhost)
+                    const baseURL = window.location.origin + window.location.pathname.replace(/index\.html$/, '');
+                    mobileURL = baseURL + 'mobile-speaker.html';
+                }
 
                 this.elements.connectionURL.textContent = mobileURL;
                 this.elements.connectionQR.style.display = 'block';
@@ -1782,14 +2522,14 @@
             _updateMobileOutputUI(enabled) {
                 const section = this.elements.mobileConnectivitySection;
                 let noteEl = section.querySelector('#mobileConnectionNote');
-    
+
                 if (enabled) {
                     // Show mobile device list area
                     this.elements.mobileDeviceList.style.display = 'block';
-                    
+
                     if (this.audioSyncSystem.isWebRTCSupported()) {
-                        this._showMobileConnectionInfo();
-    
+                        this._showMobileConnectionInfo().catch(() => { });
+
                         // Add or show explanatory note about WebSocket signaling
                         if (!noteEl) {
                             noteEl = document.createElement('div');
@@ -1809,7 +2549,7 @@
                                 WebRTC not supported in this browser for mobile connectivity.
                             </div>
                         `;
-    
+
                         if (noteEl) {
                             noteEl.style.display = 'none';
                         }
@@ -1818,7 +2558,7 @@
                     // Hide mobile device list and connection info
                     this.elements.mobileDeviceList.style.display = 'none';
                     this.elements.connectionQR.style.display = 'none';
-    
+
                     if (noteEl) {
                         noteEl.style.display = 'none';
                     }
@@ -1836,7 +2576,7 @@
                 const deviceCard = document.createElement('div');
                 deviceCard.className = 'mobile-device-item fade-in';
                 deviceCard.id = `mobile-device-${peerId}`;
-                
+
                 deviceCard.innerHTML = `
                     <div class="device-info">
                         <div class="device-icon">📱</div>
@@ -1849,7 +2589,7 @@
                         <button class="control-btn" onclick="disconnectMobileDevice('${peerId}')">Disconnect</button>
                     </div>
                 `;
-                
+
                 this.elements.mobileDeviceList.appendChild(deviceCard);
             }
 
@@ -1877,22 +2617,25 @@
         }
 
         // Global function for speaker card toggles
-        window.speakerCardToggle = function(deviceId) {
+        window.speakerCardToggle = function (deviceId) {
             // This would toggle the speaker in the audio sync system
             console.log(`Toggle speaker: ${deviceId}`);
         };
 
         // Global function for mobile device disconnection
-        window.disconnectMobileDevice = function(peerId) {
+        window.disconnectMobileDevice = function (peerId) {
             if (window.player && window.player.audioSyncSystem) {
                 window.player.audioSyncSystem.disconnectMobilePeer(peerId);
             }
         };
 
-        // Initialize the music player
+        // Initialize the music player + Spotify
         document.addEventListener('DOMContentLoaded', () => {
-            new SyncPlayMusicPlayer();
+            window.player = new SyncPlayMusicPlayer();
+            setupSpotifyControls();
+            initSpotify();
         });
     </script>
 </body>
+
 </html>
